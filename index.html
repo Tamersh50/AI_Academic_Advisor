@@ -207,16 +207,20 @@ th{font-size:12px;color:var(--ink-soft);font-weight:500}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* تخطيط الجوال: شاشة كاملة، الإدخال ثابت أسفلها */
+/* شاشة كاملة ثابتة، والمحادثة في بطاقة متمركزة على الشاشات الكبيرة */
 html,body{height:100%;overflow:hidden}
 .wrap{display:flex;flex-direction:column;height:100dvh}
 .topbar{flex:0 0 auto}
-.chatwrap{flex:1 1 auto;min-height:0;border:none;border-radius:0;box-shadow:none;background:var(--sand)}
+.chatwrap{flex:1 1 auto;min-height:0;
+  width:100%;max-width:860px;margin:0 auto;
+  border:1px solid var(--line);border-top:none;
+  border-radius:0 0 var(--r) var(--r);box-shadow:var(--shadow);background:var(--paper)}
 .stream{flex:1 1 auto;min-height:0}
 .chips{flex:0 0 auto}
 .composer{flex:0 0 auto;padding-bottom:max(12px,env(safe-area-inset-bottom))}
 .disclaimer{flex:0 0 auto;padding:8px 12px}
 @media(max-width:640px){
+  .chatwrap{max-width:100%;border:none;border-radius:0;box-shadow:none;background:var(--sand)}
   .chips{gap:6px;padding:8px 12px;max-height:96px;overflow-y:auto;
     border-top:1px solid var(--line);background:var(--paper)}
   .chip{font-size:12.5px;padding:5px 11px}
@@ -381,7 +385,7 @@ function bubble(role,html){
   d.innerHTML='<div class="bubble">'+html+'</div>';
   stream.appendChild(d); stream.scrollTop=stream.scrollHeight; return d;
 }
-const SUGGEST=["متى أُنذر أكاديميًا؟","كيف أعتذر عن الفصل؟","ما شروط التحويل لتخصص آخر؟","ما نسبة الغياب التي تحرمني من الاختبار؟","كيف يُحسب المعدل التراكمي؟","هل أستطيع إعادة مقرر لرفع معدلي؟"];
+const SUGGEST=["ما نسبة الغياب التي تحرمني من الاختبار؟", "كيف يُحسب المعدل التراكمي؟", "كيف أعتذر عن الفصل الدراسي؟", "ما شروط التحويل لتخصص آخر؟", "متى يكون الطالب راسبًا؟", "ما شروط مرتبة الشرف؟"];
 function renderChips(){
   document.getElementById('chips').innerHTML =
     SUGGEST.map(s=>`<button class="chip" onclick="ask('${s}')">${s}</button>`).join('');
