@@ -207,10 +207,30 @@ th{font-size:12px;color:var(--ink-soft);font-weight:500}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-.stream{height:calc(100vh - 250px);min-height:420px}
+/* تخطيط الجوال: شاشة كاملة، الإدخال ثابت أسفلها */
+html,body{height:100%;overflow:hidden}
+.wrap{display:flex;flex-direction:column;height:100dvh}
+.topbar{flex:0 0 auto}
+.chatwrap{flex:1 1 auto;min-height:0;border:none;border-radius:0;box-shadow:none;background:var(--sand)}
+.stream{flex:1 1 auto;min-height:0}
+.chips{flex:0 0 auto}
+.composer{flex:0 0 auto;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.disclaimer{flex:0 0 auto;padding:8px 12px}
+@media(max-width:640px){
+  .chips{gap:6px;padding:8px 12px;max-height:96px;overflow-y:auto;
+    border-top:1px solid var(--line);background:var(--paper)}
+  .chip{font-size:12.5px;padding:5px 11px}
+  .topbar-in{padding:12px 14px 11px}
+  .brand h1{font-size:17px}
+  .crest{height:34px}
+  .msg{max-width:100%}
+  .bubble{font-size:14.5px}
+  .stream{padding:14px 12px;gap:12px}
+}
 </style>
 </head>
 <body>
+<div class="wrap">
 
 <header class="topbar">
   <div class="topbar-in">
@@ -224,20 +244,17 @@ th{font-size:12px;color:var(--ink-soft);font-weight:500}
   </div>
 </header>
 
-<main class="shell">
-  <section class="page on" style="padding-top:22px">
-    <div class="card chatwrap">
-      <div class="stream" id="stream"></div>
-      <div class="chips" id="chips"></div>
-      <div class="composer">
-        <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
-        <button class="send" id="send">إرسال</button>
-      </div>
-    </div>
-    <p class="disclaimer">إجابات استرشادية مبنية على لوائح الجامعة. المرجع الرسمي هو اللوائح والقرارات المعتمدة، ومرشدك الأكاديمي للحالات الفردية.</p>
-  </section>
-</main>
+<div class="chatwrap">
+  <div class="stream" id="stream"></div>
+  <div class="chips" id="chips"></div>
+  <div class="composer">
+    <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
+    <button class="send" id="send">إرسال</button>
+  </div>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية.</p>
+</div>
 
+</div><!-- /wrap -->
 <div class="toast" id="toast"></div>
 
 <script>
