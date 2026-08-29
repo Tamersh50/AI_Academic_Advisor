@@ -494,7 +494,8 @@ async function ask(preset){
   topOf(d);
 
   srvPost({action:'log',q:text,found:chat?-1:hits.length,kind:chat?'chat':'q',
-           articles:hits.map(x=>x.article).join(' | ')}).catch(()=>{});
+           articles:hits.map(x=>x.article).join(' | '),
+           answer:d.querySelector('.bubble')?.innerText||''}).catch(()=>{});
   sendEl.disabled=false; qEl.focus();
 }
 
