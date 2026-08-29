@@ -176,6 +176,10 @@ p.sub{font-size:13px;color:var(--ink-soft);margin-bottom:16px}
 .stat b{display:block;font-size:27px;font-weight:800;color:var(--primary);line-height:1.2}
 .stat span{font-size:12px;color:var(--ink-soft)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
+.anscell .ans-full{display:none;white-space:pre-wrap;line-height:1.7}
+.anscell.open .ans-clip{display:none}
+.anscell.open .ans-full{display:block}
+.anscell:has(.ans-clip){cursor:pointer}
 th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line)}
 th{font-size:12px;color:var(--ink-soft);font-weight:500}
 
@@ -409,7 +413,7 @@ const COURTESY=[
   '<p>في أمان الله، ووفّقك الله.</p>'],
  [['من انت','مين انت','وش تسوي','ايش تسوي','وش تقدر','ماذا تفعل','وظيفتك','عرف بنفسك','ايش هذا','ما هذا','وش هذا','ما هو هذا'],
   '<p>أنا «المرشد الذكي»، مساعد إرشاد أكاديمي لطلاب كلية الأعمال بجامعة الجوف.</p><p>أجيب من نص لائحة الدراسة والاختبارات وقواعدها التنفيذية، وأذكر رقم المادة في كل إجابة. أما الحالات الفردية فمرجعها مرشدك الأكاديمي.</p>'],
- [['كيف الحال','كيفك','شخبارك','وش اخبارك','اخبارك','كيف حالك'],
+ [['كيف الحال','كيفك','شخبارك','وش اخبارك','اخبارك','كيف حالك','عامل اي','عامل ايه','عامل إيه','ازيك','إزيك','اخبارك ايه','عاملين اي','كيف الامور','الامور طيبه','شلونك','شخبارك اليوم'],
   '<p>بخير والحمد لله، وأسأل الله أن تكون كذلك.</p><p>كيف أخدمك في أمورك الأكاديمية؟</p>']
 ];
 const FILLER=new Set(['يا','الله','طيب','اخوي','استاذ','دكتور','ورحمه','وبركاته','جدا','والله','ابشر','خير','انت','انتم','هذا','كذا','مره','كثير','اوي']
@@ -451,6 +455,12 @@ async function srvPost(body){
   const j=await r.json(); if(!j.ok) throw new Error(j.error||'خطأ'); return j;
 }
 
+function fullAnswer(botDiv, hits){
+  let t=(botDiv.querySelector('.bubble')?.innerText||'').trim();
+  if(hits&&hits.length){ t+='\n\n— المصادر —';
+    hits.forEach(e=>{ t+='\n• '+(e.article||e.title||'')+(e.source?' ('+e.source+')':'')+' ['+(e.status==='approved'?'معتمد':'مسودة')+']\n'+(e.body||''); }); }
+  return t;
+}
 async function ask(preset){
   const text = preset || qEl.value.trim();
   if(!text) return;
@@ -495,7 +505,7 @@ async function ask(preset){
 
   srvPost({action:'log',q:text,found:chat?-1:hits.length,kind:chat?'chat':'q',
            articles:hits.map(x=>x.article).join(' | '),
-           answer:d.querySelector('.bubble')?.innerText||''}).catch(()=>{});
+           answer:fullAnswer(d,hits)}).catch(()=>{});
   sendEl.disabled=false; qEl.focus();
 }
 
