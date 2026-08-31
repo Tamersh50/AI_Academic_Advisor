@@ -276,6 +276,8 @@ function serverUrl(){
 /* ── لا يوجد مفتاح ولا رمز مشرف في هذا الملف ── */
 
 let KB=[];
+/* معرّف جهاز مجهول (عشوائي، بلا هوية أو IP أو موقع) — لتمييز تكرار نفس الجهاز فقط */
+let DEVICE=(function(){ try{ let d=localStorage.getItem('murshid_device'); if(!d){ d='d_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('murshid_device',d);} return d; }catch(e){ return ''; } })();
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 function cache(k,v){ try{ v===undefined? 0 : localStorage.setItem(k,JSON.stringify(v)); }catch(e){}
   if(v===undefined){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } } }
@@ -544,7 +546,7 @@ async function ask(preset){
     pendingPlan=text;
     const d=bubble('bot','<p>سؤالك عن الخطة الدراسية، وهي تختلف بين أقسام الكلية الثلاثة. أيّ قسم تقصد؟</p>'+deptButtonsHTML());
     topOf(d);
-    srvPost({action:'log',q:text,found:-1,kind:'clarify'}).catch(()=>{});
+    srvPost({action:'log',q:text,found:-1,kind:'clarify',device:DEVICE}).catch(()=>{});
     sendEl.disabled=false; qEl.focus(); return;
   }
 
@@ -585,7 +587,7 @@ async function ask(preset){
 
   srvPost({action:'log',q:text,found:chat?-1:hits.length,kind:chat?'chat':'q',
            articles:hits.map(x=>x.article).join(' | '),
-           answer:fullAnswer(d,hits)}).catch(()=>{});
+           answer:fullAnswer(d,hits),device:DEVICE}).catch(()=>{});
   sendEl.disabled=false; qEl.focus();
 }
 
@@ -593,7 +595,7 @@ function rate(id,val,q){
   const box=document.getElementById(id);
   box.querySelectorAll('button').forEach(b=>b.classList.remove('picked'));
   box.querySelectorAll('button')[val?0:1].classList.add('picked');
-  srvPost({action:'log',q:q,found:'',kind:'q',rate:val}).catch(()=>{});
+  srvPost({action:'log',q:q,found:'',kind:'q',rate:val,device:DEVICE}).catch(()=>{});
   toast(val?'شكرًا لك':'سُجِّلت الملاحظة لمراجعة الفريق');
 }
 
