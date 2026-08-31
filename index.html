@@ -564,7 +564,9 @@ async function ask(preset){
         sources:hits.map(e=>({article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))});
       answer='<p>'+esc(j.text).replace(/\n+/g,'</p><p>')+'</p>';
     }catch(err){
-      answer='<p>تعذّر الوصول إلى خدمة الصياغة. إليك النصوص النظامية مباشرة:</p>';
+      const top=hits[0];
+      answer='<p>'+esc(top.body).replace(/\n+/g,'</p><p>')+'</p>'+
+             '<p style="color:#8a6d1f;font-size:.9em">(عُرض النص النظامي مباشرة؛ خدمة الصياغة الذكية مشغولة مؤقتًا — حاول مرة أخرى بعد قليل لصياغة أوضح.)</p>';
     }
   }
 
