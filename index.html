@@ -333,6 +333,57 @@ function tokMatch(q,list){
   return best;
 }
 
+/* ═══ الأقسام: كشف القسم في السؤال وترشيح خطط الأقسام الأخرى ═══ */
+/* كشف دقيق: لا يُطلَق إلا بإشارة صريحة (قسم/تخصص/برنامج…) أو اسم قسم في آخر السؤال،
+   حتى لا تُطابَق كلمات مثل «الاستثمارية/المالية/الأعمال» الواردة في أسماء المقررات. */
+const DEPT_FORMS=[
+  {name:'المحاسبة', forms:['محاسبه','المحاسبه']},
+  {name:'إدارة الأعمال', forms:['اداره الاعمال','ادارة اعمال','اداره اعمال','اداره الأعمال']},
+  {name:'التمويل والاستثمار', forms:['التمويل والاستثمار','تمويل واستثمار','التمويل','تمويل']}
+];
+const DEPT_CUE=['قسم','تخصص','تخصصي','برنامج','مسار','مساري','بكالوريوس'];
+function queryDept(text){
+  const t=norm(text), w=t.split(' ');
+  /* ١) إشارة صريحة: كلمة دلالة يتبعها اسم قسم */
+  for(let i=0;i<w.length;i++){
+    if(DEPT_CUE.includes(w[i])){
+      const rest=w.slice(i+1).join(' ');
+      for(const d of DEPT_FORMS) if(d.forms.some(f=>rest.startsWith(f))) return d.name;
+    }
+  }
+  /* ٢) اسم القسم كمؤهّل ختامي في آخر السؤال */
+  for(const d of DEPT_FORMS)
+    for(const f of d.forms)
+      if(t===f || t.endsWith(' '+f)) return d.name;
+  return null;
+}
+function isPlanEntry(e){ return (e.source||'').indexOf('الخطط')===0; }
+/* موضوع المدخل: اسم المقرر أو اسم المستوى — لمقارنة تكرار الموضوع عبر الأقسام */
+function planSubject(e){
+  const t=e.title||'';
+  let m=t.match(/^مقرر\s+(.+?)\s*\(/);       // «مقرر الاسم (الرمز) — القسم»
+  if(m) return 'c:'+norm(m[1]);
+  m=t.match(/—\s*(المستوى\s+\S+)/);           // «القسم — المستوى X»
+  if(m) return 'l:'+norm(m[1]);
+  return null;
+}
+/* سؤال خطط غامض: لا قسم في السؤال، وموضوع أعلى نتيجة يتكرر في قسمين فأكثر */
+function planAmbiguous(text, hits){
+  if(queryDept(text)) return false;
+  if(!hits.length || !isPlanEntry(hits[0])) return false;
+  /* لأسئلة المستوى: فضّل مدخل المستوى إن ورد ضمن النتائج العليا */
+  let head=hits[0];
+  if(/مستوى/.test(norm(text))){
+    const lv=hits.slice(0,3).find(e=>isPlanEntry(e) && /—\s*المستوى/.test(e.title||''));
+    if(lv) head=lv;
+  }
+  const key=planSubject(head);
+  if(!key) return false;
+  const depts=new Set();
+  KB.forEach(e=>{ if(isPlanEntry(e) && planSubject(e)===key) depts.add(e.dept); });
+  return depts.size>=2;
+}
+
 function retrieve(query,n=4){
   const qt=[...new Set(tokens(query))];
   if(!qt.length) return [];
@@ -359,8 +410,14 @@ function retrieve(query,n=4){
 
   /* شرط القبول: تغطية كافية، أو مطابقة قوية في العنوان أو الكلمات المفتاحية */
   const need = qt.length<=2 ? 0.5 : 0.45;
-  const ok=scored.filter(x=>x.s>0 && (x.cov>=need || x.best>=4)).sort((a,b)=>b.s-a.s);
+  let ok=scored.filter(x=>x.s>0 && (x.cov>=need || x.best>=4)).sort((a,b)=>b.s-a.s);
   if(!ok.length) return [];
+  /* إن ذُكر القسم: استبعد مدخلات خطط الأقسام الأخرى (تبقى اللائحة والعام) */
+  const wd=queryDept(query);
+  if(wd){
+    const f=ok.filter(x=>!isPlanEntry(x.e) || (x.e.dept||'').includes(wd) || (x.e.dept||'').includes('جميع'));
+    if(f.length) ok=f;
+  }
   const top=ok[0].s;
   return ok.filter(x=>x.s>=top*0.45).slice(0,n).map(x=>x.e);
 }
@@ -446,6 +503,18 @@ function refsHTML(list){
 }
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+let pendingPlan=null;   /* يحمل سؤال الخطط بانتظار اختيار الطالب لقسمه */
+function deptButtonsHTML(){
+  return '<div class="chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
+    DEPT_FORMS.map(d=>`<button class="chip" onclick="askDept('${d.name}')">${d.name}</button>`).join('')+
+    '</div>';
+}
+function askDept(dept){
+  const q=pendingPlan; pendingPlan=null;
+  if(!q) return;
+  ask('قسم '+dept+' — '+q);   /* إشارة صريحة تضمن كشف القسم بدقة */
+}
+
 
 /* ══════════════════ الاتصال بالخادم ══════════════════ */
 async function srvPost(body){
@@ -469,6 +538,15 @@ async function ask(preset){
 
   const greet = smalltalk(text);
   const hits  = greet? [] : retrieve(text);
+
+  /* سؤال خطط دون قسم → اسأل الطالب عن قسمه أولًا */
+  if(!greet && planAmbiguous(text, hits)){
+    pendingPlan=text;
+    const d=bubble('bot','<p>سؤالك عن الخطة الدراسية، وهي تختلف بين أقسام الكلية الثلاثة. أيّ قسم تقصد؟</p>'+deptButtonsHTML());
+    topOf(d);
+    srvPost({action:'log',q:text,found:-1,kind:'clarify'}).catch(()=>{});
+    sendEl.disabled=false; qEl.focus(); return;
+  }
 
   const wait=document.createElement('div');
   wait.className='msg bot';
