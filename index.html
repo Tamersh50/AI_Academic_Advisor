@@ -278,6 +278,8 @@ function serverUrl(){
 let KB=[];
 /* معرّف جهاز مجهول (عشوائي، بلا هوية أو IP أو موقع) — لتمييز تكرار نفس الجهاز فقط */
 let DEVICE=(function(){ try{ let d=localStorage.getItem('murshid_device'); if(!d){ d='d_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('murshid_device',d);} return d; }catch(e){ return ''; } })();
+const COLLEGES=['الأعمال','التطبيقية'];
+let COLLEGE=(function(){ try{ return localStorage.getItem('murshid_college')||''; }catch(e){ return ''; } })();
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 function cache(k,v){ try{ v===undefined? 0 : localStorage.setItem(k,JSON.stringify(v)); }catch(e){}
   if(v===undefined){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } } }
@@ -299,7 +301,9 @@ const SYN={};
 [['gpa','معدل تراكمي'],['جي بي ايه','معدل تراكمي'],['انذار','انذار تحذير'],['رسوب','رسب راسب اعادة'],
  ['طرد','فصل'],['انسحاب','اعتذار حذف'],['تجميد','تاجيل ايقاف'],['ساعات','وحدات عبء'],
  ['بريكوست','متطلب سابق'],['متطلب','متطلب سابق'],['سكشن','شعبة مقرر'],['دكتور','عضو هيئة تدريس'],
- ['ديجري','تقدير درجة'],['تخصص','قسم تحويل'],['ابغى','اريد'],['ودي','اريد'],['ايش','ما'],['وش','ما']
+ ['ديجري','تقدير درجة'],['تخصص','قسم تحويل'],['ابغى','اريد'],['ودي','اريد'],['ايش','ما'],['وش','ما'],
+ /* لهجة الطلاب ← المصطلح اللائحي */
+ ['ترم','فصل'],['الترم','فصل'],['سمستر','فصل'],['اطلع','خروج'],['اخرج','خروج'],['اوجل','تاجيل'],['اجل','تاجيل'],['أأجل','تاجيل'],['يلغي','الغاء'],['الغى','الغاء'],['يبلغوني','ابلاغ استدعاء'],['يبلغني','ابلاغ استدعاء'],['اتحول','تحويل'],['احول','تحويل'],['انتقل','تحويل'],['يفصلني','فصل'],['انفصلت','فصل مفصول'],['تنزل','اعلان'],['ينزل','اعلان'],['سلسال','سلاسل'],['حلق','اقراط'],['ابي','اريد'],['ابى','اريد'],['اسوي','افعل'],['مو','غير'],['برا','خارج'],['الدكتور','عضو هيئة تدريس'],['الاكل','ماكولات'],['اكل','ماكولات'],['ضيع','فقدان'],['ضاعت','فقدان'],['ح','حرمان محروم'],['هـ','راسب'],['ل','غير مكتمل'],['م','مستمر'],['ع','اعتذار'],['dn','حرمان'],['ic','غير مكتمل'],['w','اعتذار']
 ].forEach(([k,v])=>SYN[norm(k)]=norm(v));
 
 /* إزالة أدوات التعريف والعطف من أول الكلمة */
@@ -386,11 +390,264 @@ function planAmbiguous(text, hits){
   return depts.size>=2;
 }
 
+let PATH=(function(){ try{ return localStorage.getItem('murshid_path')||''; }catch(e){ return ''; } })();
+function savePath(p){ PATH=p||''; try{ PATH?localStorage.setItem('murshid_path',PATH):localStorage.removeItem('murshid_path'); }catch(e){} }
+function resetCollege(){ COLLEGE=''; savePath(''); try{ localStorage.removeItem('murshid_college'); }catch(e){} }
+
+/* ═══ مسار طالب كلية الأعمال: المسار المشترك أو أحد الأقسام ═══
+   يُسأل الطالب مرة واحدة عند أول سؤال عن المقررات أو الخطة (في أي مستوى)، ويُحفظ اختياره.
+   ذكر قسم أو المسار صراحةً في السؤال يسري على ذلك السؤال وحده. */
+const TRACK='مسار القبول الأعمال';
+const PATHS=[TRACK,'المحاسبة','إدارة الأعمال','التمويل والاستثمار'];
+function isTrackEntry(e){ return (e.dept||'')==='مسار مشترك'; }
+/* مدخل «قائمة مقررات/خطة» — لا المداخل التعريفية العامة عن المسار */
+function isCourseEntry(e){ return isPlanEntry(e) || (isTrackEntry(e) && /مقررات|المستوى|الاختياري/.test(e.title||'')); }
+function queryTrack(text){ return /مسار القبول|المسار المشترك|مسار مشترك|المسارات المشترك|المسار الجديد/.test(norm(text)); }
+function explicitPath(text){ return queryTrack(text) ? TRACK : queryDept(text); }
+function effectivePath(text){ return COLLEGE==='الأعمال' ? (explicitPath(text) || PATH || '') : ''; }
+function needsPath(text,hits){
+  if(COLLEGE!=='الأعمال' || PATH || explicitPath(text)) return false;
+  if(hits.slice(0,2).some(isCourseEntry)) return true;
+  /* صياغة عن الخطة/المقررات مع وجود مدخل خطة ضمن النتائج */
+  return /خطه|مقرر|مستوي|مواد|ماده|متطلب/.test(norm(text)) && hits.some(isCourseEntry);
+}
+function pathFilter(ok,query){
+  const ep=effectivePath(query); if(!ep) return ok;
+  if(ep===TRACK) return ok.filter(x=>!isPlanEntry(x.e));           /* طالب المسار: لا خطط أقسام قديمة */
+  return ok.filter(x=>!(isTrackEntry(x.e)&&isCourseEntry(x.e)) &&  /* طالب القسم: لا مقررات المسار، ولا خطط غير قسمه */
+    (!isPlanEntry(x.e) || (x.e.dept||'').includes(ep) || (x.e.dept||'').includes('جميع')));
+}
+function pathLabel(p){ return p===TRACK ? TRACK+' (المسار المشترك)' : 'قسم '+p; }
+function pathButtonsHTML(){
+  return '<div class="chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
+    PATHS.map(p=>`<button class="chip" onclick="pickPath('${p}')">${p===TRACK?TRACK+' (المشترك)':p}</button>`).join('')+'</div>';
+}
+function pickPath(p){
+  savePath(p);
+  bubble('bot','<p>تمام — ستكون إجابات المقررات والخطط وفق <b>'+pathLabel(p)+'</b>. ويمكنك تغييره في أي وقت بكتابة «تغيير المسار».</p>');
+  const q=pendingPlan; pendingPlan=null;
+  if(q) ask(q);
+}
+
+
+/* ═══ حاسبة الساعات المتبقية للتخرج — حساب آلي من بيانات الخطة (pdata_) دون نموذج ذكاء اصطناعي ═══
+   النمط (أ): الطالب يذكر عدد الوحدات التي اجتازها ← المتبقي = مجموع الخطة − المجتاز.
+   النمط (ب): الطالب يذكر المقررات (رموزًا أو أسماءً) أو المستويات التي أنهاها ← تفصيل كامل.
+   إذا توفر الاثنان يُعتمد (ب). لا يُحفظ شيء من بيانات الطالب. */
+function isPdata(e){ return /^pdata_/.test(e.id||''); }
+let pendingCalc=false;
+const CALC_AR='٠١٢٣٤٥٦٧٨٩';
+function ar(n){ return String(n).replace(/\d/g,d=>CALC_AR[d]); }
+function latinDigits(s){ return (s||'').replace(/[٠-٩]/g,d=>CALC_AR.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); }
+function cnorm(s){ return latinDigits(norm(latinDigits(s||'').replace(/\d+[.,٫]\d+/g,' '))); }
+/* للمطابقة بالأسماء: حذف واو العطف من أول الكلمة (في النص وأسماء المقررات معًا) */
+function wstrip(s){ return s.split(' ').map(w=>w.length>3&&w[0]==='و'?w.slice(1):w).join(' '); }
+function vU(n){ return ar(n)+(n>10||n===1?' وحدة':' وحدات'); }
+function getPlan(name){
+  const e=KB.find(x=>isPdata(x) && (x.dept||'').includes(name));
+  if(!e) return null; try{ return JSON.parse(e.body); }catch(_){ return null; }
+}
+/* هل السؤال عن الساعات/المقررات المتبقية؟ */
+function calcIntent(t){
+  return /(ساعات|ساعه|وحدات|وحده|مواد|مقررات|مقرر|ماده)[^.؟?]{0,25}(المتبقي|الباقي|متبقي|باقي|تبقي|يتبقي|بقي|باقيه|متبقيه)/.test(t)
+      || /(كم|ايش|وش|ما|ماذا|اعرف)[^.؟?]{0,20}(باقي|بقي|تبقي|يتبقي|متبقي)[^.؟?]{0,25}(تخرج|ساع|وحد|مواد|ماده|مقرر|الخطه)/.test(t)
+      || /(احسب|حساب|حاسبه)[^.؟?]{0,20}(ساعات|الساعات|وحدات|المتبقي|الباقي|التخرج)/.test(t)
+      || /(باقي|بقي|تبقي|متبقي)\s*(لي|علي|لي علي)?\s*(علي|على)?\s*(التخرج|اتخرج)/.test(t)
+      || /(متي|كم فصل|كم ترم)[^.؟?]{0,10}(اتخرج|التخرج)/.test(t);
+}
+const ORD={'الاول':1,'اول':1,'الثاني':2,'ثاني':2,'الثالث':3,'ثالث':3,'الرابع':4,'رابع':4,'الخامس':5,'خامس':5,'السادس':6,'سادس':6,'السابع':7,'سابع':7,'الثامن':8,'ثامن':8};
+const DONE_RX=/(انهيت|اجتزت|خلصت|نجحت|انتهيت|اكملت|اتممت|انجزت|درست|انهي|منهي|مجتاز|خالص)/;
+const NEG_RX=/(رسبت|راسب|لم اجتز|ما اجتزت|لم انجح|ما نجحت|ما خلصت|لم انه|ما درست|لم ادرس|محروم|حرمت|انسحبت|اعتذرت)/;
+function parseCalc(text,plan){
+  const out={codes:[],neg:[],num:null,numStrong:false,levels:[],names:[]};
+  /* المقاطع السلبية (رسبت في …) تُستبعد */
+  const segs=latinDigits(text).replace(/\d+[.,٫]\d+/g,' ').split(/[.؛\n!؟?،,]/).map(cnorm);
+  const negText=[], posText=[];
+  segs.forEach(s=>{ const m=s.match(NEG_RX); if(m){ posText.push(s.slice(0,m.index)); negText.push(s.slice(m.index)); } else posText.push(s); });
+  const codeRx=/\b([a-z]{2,5})\s*-?\s*(\d{4})\b/g;
+  const grab=(s,arr)=>{ let m; while((m=codeRx.exec(s))) arr.push(m[1].toUpperCase()+' '+m[2]); };
+  posText.forEach(s=>grab(s,out.codes)); negText.forEach(s=>grab(s,out.neg));
+  /* أسماء المقررات: الأطول أولًا مع استهلاك النص المطابَق */
+  if(plan){
+    const names=[];
+    plan.tracks.forEach(tr=>{ tr.levels.forEach(l=>l.i.forEach(x=>x.c&&names.push(x)));
+      Object.values(tr.groups).forEach(g=>g.c.forEach(x=>names.push(x))); });
+    const uniq={}; names.forEach(x=>{ const k=wstrip(cnorm(x.n)); if(!uniq[k]) uniq[k]=new Set(); uniq[k].add(x.c); });
+    const keys=Object.keys(uniq).sort((a,b)=>b.length-a.length);
+    const scan=(s,arr)=>{ s=' '+wstrip(s.replace(codeRx,' '))+' ';
+      keys.forEach(k=>{ const kk=' '+k+' '; let i; while((i=s.indexOf(kk))>=0){ uniq[k].forEach(c=>arr.push(c)); s=s.slice(0,i)+' # '+s.slice(i+kk.length); } }); return s; };
+    posText.forEach(s=>scan(s,out.names)); negText.forEach(s=>scan(s,out.neg));
+  }
+  const pos=posText.join(' . ');
+  /* المستويات المنجزة (بفعل إنجاز صريح فقط) */
+  const w=pos.split(' ');
+  for(let i=0;i<w.length;i++){
+    if(!DONE_RX.test(w[i])) continue;
+    const win=w.slice(i+1,i+12);
+    const nm=win.join(' ').match(/^(?:اول\s*)?(\d)\s*(مستويات|مستوي)/);
+    if(nm){ for(let k=1;k<=Math.min(8,+nm[1]);k++) out.levels.push(k); continue; }
+    const mi=win.findIndex(x=>/^(ال)?مستوي(ات|ين)?$/.test(x));
+    if(mi<0) continue;
+    const lv=[]; let range=false;
+    for(const x of win.slice(mi+1)){
+      if(/^(الي|حتي|لغايه|لين|ل)$/.test(x)){ range=true; continue; }
+      const y=x.replace(/^و/,''); if(ORD[y]) lv.push(ORD[y]); else if(/^[1-8]$/.test(y)) lv.push(+y);
+      else if(lv.length && !/^(و|من|المستوي)$/.test(x)) break;
+    }
+    if(!lv.length) continue;
+    if(range){ const a=lv.length>1?Math.min(...lv):1, b=Math.max(...lv); for(let k=a;k<=b;k++) out.levels.push(k); }
+    else lv.forEach(k=>out.levels.push(k));
+  }
+  out.levels=[...new Set(out.levels)].sort((a,b)=>a-b);
+  /* عدد الوحدات المجتازة */
+  const nt=pos.replace(codeRx,' ');
+  const unitNear=/(\d{1,3})\s*(ساعه|ساعات|وحده|وحدات|ساعه معتمده|وحده معتمده)/;
+  const verbNear=new RegExp(DONE_RX.source+'\\s*(علي|على)?\\s*(\\d{1,3})(?!\\s*(مستوي|فصل|ترم|سنه))');
+  let m=nt.match(unitNear)||null, n=null;
+  if(m) n=+m[1]; else { m=nt.match(verbNear); if(m) n=+m[m.length-2]; }
+  out.numStrong = n!==null || /^\s*\d{1,3}\s*$/.test(nt);
+  if(n===null){ const all=(nt.match(/(?<![\d.])\d{1,3}(?![\d.])/g)||[]).filter(x=>!new RegExp('(مستوي|المستوي)\\s*'+x+'(?!\\d)|(?<!\\d)'+x+'\\s*(مستوي|فصل|ترم|سنه|سنوات|اسابيع|يوم|%)').test(nt)); if(all.length===1) n=+all[0]; }
+  if(n!==null && n>=0 && n<=300) out.num=n;
+  return out;
+}
+function calcTrack(tr,passedCodes,levelsDone){
+  const P=new Set(passedCodes), counted=new Set();
+  const lvItems=tr.levels.map(l=>l.i);
+  const groupOf={}; Object.entries(tr.groups).forEach(([g,G])=>G.c.forEach(x=>{ groupOf[x.c]=g; }));
+  const mand={}; tr.levels.forEach((l,li)=>l.i.forEach(x=>{ if(x.c) mand[x.c]={...x,lv:li}; }));
+  /* المستويات المنجزة: كل مقرراتها الإجبارية + خاناتها الاختيارية */
+  const vpick={};
+  levelsDone.forEach(k=>{ const l=tr.levels[k-1]; if(!l) return; l.i.forEach(x=>{ if(x.c) P.add(x.c); else vpick[x.s]=(vpick[x.s]||0)+1; }); });
+  const done=new Set(), extra=[], gDone={};
+  P.forEach(c=>{ if(mand[c]){ done.add(c); counted.add(c); } });
+  Object.entries(tr.groups).forEach(([g,G])=>{
+    const got=G.c.filter(x=>P.has(x.c)&&!mand[x.c]);
+    const slots=vpick[g]||0, room=Math.max(0,G.pick-slots);
+    got.slice(0,room).forEach(x=>{ done.add(x.c); counted.add(x.c); });
+    got.slice(room).forEach(x=>extra.push(x));
+    gDone[g]=Math.min(G.pick,slots+Math.min(room,got.length));
+  });
+  const unknown=[...P].filter(c=>!mand[c]&&!groupOf[c]);
+  const gUnit=g=>tr.groups[g].c[0].u;
+  let passedU=0; const typeReq={}, typeDone={};
+  tr.levels.forEach(l=>l.i.forEach(x=>{ typeReq[x.t]=(typeReq[x.t]||0)+x.u; }));
+  Object.values(mand).forEach(x=>{ if(done.has(x.c)){ passedU+=x.u; typeDone[x.t]=(typeDone[x.t]||0)+x.u; } });
+  Object.entries(gDone).forEach(([g,n])=>{ const slot=tr.levels.flatMap(l=>l.i).find(x=>x.s===g); const u=n*gUnit(g); passedU+=u; if(slot) typeDone[slot.t]=(typeDone[slot.t]||0)+u; });
+  /* المتبقي حسب المستوى: الخانات تُملأ بالترتيب */
+  const filled={...gDone}; const byLevel=[];
+  tr.levels.forEach(l=>{
+    const rem=[];
+    l.i.forEach(x=>{
+      if(x.c){ if(!done.has(x.c)) rem.push(x); }
+      else { if(filled[x.s]>0) filled[x.s]--; else rem.push(x); }
+    });
+    if(rem.length) byLevel.push({n:l.n,rem,all:rem.length===l.i.length,u:l.u});
+  });
+  const preOK=x=>(!x.p||done.has(x.p))&&(!x.pu||passedU>=x.pu);
+  const elig=[];
+  Object.values(mand).forEach(x=>{
+    if(done.has(x.c)||!preOK(x)) return;
+    if(x.co && !done.has(x.co)){ const y=mand[x.co]; if(!y||!preOK(y)) return; elig.push({...x,withCo:x.co}); }
+    else elig.push(x);
+  });
+  const gElig=[];
+  Object.entries(tr.groups).forEach(([g,G])=>{
+    const left=G.pick-gDone[g]; if(left<=0) return;
+    gElig.push({g,G,left,opts:G.c.filter(x=>!P.has(x.c)&&preOK(x))});
+  });
+  return {vpick,passedU,remaining:tr.total-passedU,total:tr.total,typeReq,typeDone,done,extra,unknown,byLevel,elig,gElig,mand};
+}
+function trackOf(plan,codes,text){
+  if(plan.tracks.length===1) return {tr:plan.tracks[0]};
+  const t=cnorm(text);
+  if(/مسار (اداره )?التسويق/.test(t)) return {tr:plan.tracks.find(x=>/التسويق/.test(x.track))};
+  if(/مسار (الاداره )?الماليه/.test(t)) return {tr:plan.tracks.find(x=>/المالية/.test(x.track))};
+  const sets=plan.tracks.map(tr=>{ const s=new Set(); tr.levels.forEach(l=>l.i.forEach(x=>x.c&&s.add(x.c))); Object.values(tr.groups).forEach(g=>g.c.forEach(x=>s.add(x.c))); return s; });
+  const score=sets.map((s,i)=>codes.filter(c=>s.has(c)&&!sets.some((o,j)=>j!==i&&o.has(c))).length);
+  if(score[0]===score[1]) return {tr:null};
+  return {tr:plan.tracks[score[0]>score[1]?0:1], conflict:Math.min(...score)>0};
+}
+function liC(x){ return esc(x.n)+' ('+x.c+') — '+vU(x.u); }
+function calcHTML(text){
+  const T=cnorm(text);
+  const intent=calcIntent(T) || (/(المتبقي|الباقي|باقي|بقي|تبقي|يتبقي)/.test(T) && (DONE_RX.test(T) || /\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(T)));
+  if(!intent && !pendingCalc) return null;
+  if(COLLEGE==='التطبيقية'){ pendingCalc=false;
+    return {html:'<p>حساب الساعات المتبقية غير متاح حاليًا لبرامج <b>الكلية التطبيقية</b>، لأن خططها الدراسية لم تُضف بعد إلى قاعدة المعرفة.</p><p>يمكنك معرفة ما تبقى لك من سجلك الأكاديمي في بوابة الطالب، أو من مرشدك الأكاديمي.</p>'}; }
+  if(!COLLEGE) return null;
+  const ep=effectivePath(text);
+  if(!ep){ return {needPath:true}; }
+  if(ep===TRACK){ pendingCalc=false;
+    return {html:'<p>حساب الساعات المتبقية للتخرج غير متاح حاليًا لطلاب <b>مسار القبول الأعمال (المسار المشترك)</b>؛ فالمعتمد حتى الآن مقررات المستويين الأول والثاني فقط (٣٥ وحدة)، وأما خطة ما بعد التخصيص فسيتم إضافتها بمجرد اعتمادها من الجهات المختصة بالجامعة.</p><p>للاستفسار عن وضعك الحالي راجع سجلك الأكاديمي أو مرشدك الأكاديمي.</p>'}; }
+  const plan=getPlan(ep);
+  if(!plan){ pendingCalc=false; return {html:'<p>تعذّر تحميل بيانات خطة '+esc(ep)+' في الحاسبة. يرجى إبلاغ مسؤول النظام.</p>'}; }
+  const D=parseCalc(text,plan);
+  const codes=[...new Set([...D.codes,...D.names])].filter(c=>!D.neg.includes(c));
+  const hasB=codes.length>0||D.levels.length>0, hasA=D.num!==null && (intent||D.numStrong);
+  if(!hasB && !hasA){
+    if(pendingCalc && !intent){ pendingCalc=false; return null; }
+    pendingCalc=true;
+    return {html:'<p><b>حاسبة الساعات المتبقية — قسم '+esc(ep)+'</b></p><p>أرسل لي أحد الأمرين:</p><p>١) <b>عدد الوحدات (الساعات) التي اجتزتها</b>، مثل: «اجتزت ٦٠ وحدة» — فأحسب لك المتبقي من مجموع الخطة.</p><p>٢) أو <b>المقررات التي نجحت فيها</b> برموزها أو أسمائها، مثل: «ACCT 1111، BUS 1111، BUS 1141»، أو «أنهيت المستوى الأول والثاني» — فأعطيك تفصيلًا بالمتبقي حسب المستوى ونوع المتطلب، وما يمكنك تسجيله الآن بحسب المتطلبات السابقة.</p>'};
+  }
+  pendingCalc=false;
+  const note='<p style="color:#8a6d1f;font-size:.9em">تنبيه: هذا حساب استرشادي من الخطة الدراسية المعتمدة لقسمك وفي حدود البيانات التي ذكرتها، ولا يشمل المعادلات أو المقررات المحوّلة أو المعفاة أو حالات الرسوب، ولا يُحفظ شيء مما كتبت. المرجع الرسمي سجلك الأكاديمي في بوابة الطالب ومرشدك الأكاديمي.</p>';
+  const head='<p><b>حساب الساعات المتبقية للتخرج — قسم '+esc(ep)+'</b></p>';
+  /* ── النمط (أ) ── */
+  if(!hasB){
+    const tot=plan.tracks[0].total, n=D.num;
+    if(n>tot) return {html:head+'<p>العدد الذي ذكرته ('+ar(n)+') أكبر من مجموع وحدات خطة قسمك ('+vU(tot)+' معتمدة). تأكد من الرقم، أو اذكر المقررات التي اجتزتها.</p>'+note};
+    const rem=tot-n;
+    let h=head+'<p>مجموع وحدات الخطة: <b>'+vU(tot)+' معتمدة</b> — المجتاز (حسب ما ذكرت): '+vU(n)+' — <b>المتبقي: '+vU(rem)+' معتمدة</b>.</p>';
+    const coop=plan.tracks[0].levels.flatMap(l=>l.i).find(x=>x.pu);
+    if(coop){ h+= n>=coop.pu ? '<p>استوفيت شرط الوحدات للتدريب التعاوني (١) ('+esc(coop.pt)+').</p>'
+                              : '<p>متطلب التدريب التعاوني (١) هو '+esc(coop.pt)+'؛ يتبقى لك '+vU(coop.pu-n)+' لتستوفيه.</p>'; }
+    h+='<p>لتفصيل المقررات المتبقية حسب المستوى وما يمكنك تسجيله الآن، اكتب المقررات التي نجحت فيها (رموزها أو أسماءها).</p>';
+    return {html:h+note};
+  }
+  /* ── النمط (ب) ── */
+  const {tr,conflict}=trackOf(plan,codes,text);
+  const tracks=tr?[tr]:plan.tracks;
+  const R=tracks.map(t=>calcTrack(t,codes,D.levels));
+  const r=R[0];
+  let h=head;
+  if(!tr) h+='<p>لم يتحدد مسارك في إدارة الأعمال (إدارة التسويق أو الإدارة المالية) من المقررات التي ذكرتها؛ المستويات من الأول إلى الرابع مشتركة، أما مقررات المستويات من الخامس إلى الثامن فتختلف. لعرضها اكتب «مسار التسويق» أو «مسار الإدارة المالية» مع المقررات.</p>';
+  else if(plan.tracks.length>1) h+='<p>المسار: <b>'+esc(tr.track)+'</b>'+(conflict?' (ذكرتَ مقررات من المسارين؛ اعتُمد الأكثر)':'')+'.</p>';
+  const remTxt=R.every(x=>x.remaining===r.remaining)?'<b>'+vU(r.remaining)+' معتمدة</b>':R.map((x,i)=>esc(tracks[i].track)+': '+vU(x.remaining)).join('، ');
+  h+='<p>مجموع وحدات الخطة: <b>'+vU(r.total)+' معتمدة</b> — المحتسب لك: '+vU(r.passedU)+' — المتبقي: '+remTxt+'.</p>';
+  if(D.num!==null && D.num!==r.passedU) h+='<p>ذكرتَ أنك اجتزت '+vU(D.num)+'، بينما مجموع ما تعرّفتُ عليه من مقرراتك '+vU(r.passedU)+'؛ اعتُمد التفصيل بالمقررات. إن كان لديك مقررات لم تذكرها فأضفها لدقة الحساب.</p>';
+  const TY={'جامعة':'متطلبات الجامعة','كلية':'متطلبات الكلية','برنامج':'متطلبات البرنامج'};
+  h+='<p>المتبقي حسب نوع المتطلب: '+Object.keys(TY).filter(k=>r.typeReq[k]).map(k=>{ const v=r.typeReq[k]-(r.typeDone[k]||0); return TY[k]+' '+(v?vU(v):'مكتملة'); }).join('، ')+'.</p>';
+  const doneList=[...r.done].map(c=>r.mand[c]||Object.values((tr||plan.tracks[0]).groups).flatMap(g=>g.c).find(x=>x.c===c)).filter(Boolean);
+  h+='<p><b>المحتسب من مقرراتك'+(D.levels.length?' (مع المستويات المنجزة: '+D.levels.map(k=>(tracks[0].levels[k-1]||{}).n).filter(Boolean).join('، ')+')':'')+':</b> '+(doneList.length?doneList.map(x=>esc(x.n)+' ('+x.c+')').join('، '):'—')+'.</p>';
+  if(r.extra.length) h+='<p>مقررات اختيارية زائدة عن المطلوب في مجموعتها (لا تُحتسب ضمن وحدات الخطة): '+r.extra.map(x=>esc(x.n)+' ('+x.c+')').join('، ')+'.</p>';
+  const unk=[...new Set(R.map(x=>x.unknown).reduce((a,b)=>a.filter(c=>b.includes(c))))];
+  if(unk.length) h+='<p>رموز لا توجد في خطة قسمك (لم تُحتسب): '+unk.join('، ')+'.</p>';
+  if(D.neg.length) h+='<p>استُبعدت المقررات التي ذكرتَ أنك لم تجتزها: '+[...new Set(D.neg)].join('، ')+'.</p>';
+  /* المتبقي حسب المستوى */
+  const lvHTML=(rr,maxLv)=>'<ul>'+rr.byLevel.filter(b=>maxLv?tracks[0].levels.findIndex(l=>l.n===b.n)<maxLv:true).map(b=>'<li><b>'+b.n+':</b> '+(b.all?'كامل المستوى ('+vU(b.u)+' معتمدة، '+ar(b.rem.length)+' مقررات)':b.rem.map(x=>x.c?liC(x):esc(x.l)+' — '+vU(x.u)).join('؛ '))+'</li>').join('')+'</ul>';
+  if(tr){ h+='<p><b>المتبقي حسب المستوى:</b></p>'+lvHTML(r); }
+  else { h+='<p><b>المتبقي في المستويات المشتركة (الأول–الرابع):</b></p>'+lvHTML(r,4); }
+  /* ما يمكن تسجيله الآن */
+  const el=tr? r.elig : r.elig.filter(x=>x.lv<4);
+  if(el.length){
+    el.sort((a,b)=>a.lv-b.lv);
+    h+='<p><b>مقررات إجبارية استوفيتَ متطلباتها السابقة ويمكنك تسجيلها (بحسب الخطة):</b></p><ul>'+el.map(x=>'<li>'+liC(x)+' — '+(tracks[0].levels[x.lv]||{}).n+(x.withCo?' — تُسجَّل متزامنة مع '+x.withCo:'')+'</li>').join('')+'</ul>';
+  }
+  const ge=tr? r.gElig : r.gElig.filter(x=>x.g.startsWith('U'));
+  if(ge.length) h+='<p><b>المقررات الاختيارية المتبقية:</b></p><ul>'+ge.map(x=>'<li>'+esc(x.G.title)+': متبقٍّ '+ar(x.left)+' من '+ar(x.G.pick)+(x.opts.length?' — المتاح لك الآن'+((r.vpick||{})[x.g]?' (عدا ما درسته منها)':'')+': '+x.opts.map(y=>esc(y.n)+' ('+y.c+')').join('، '):' — لم تستوفِ بعدُ المتطلب السابق لأيٍّ من مقرراتها')+'</li>').join('')+'</ul>';
+  return {html:h+note};
+}
+
+function inCollege(e){
+  if(!COLLEGE) return true;
+  const c=e.college||'';
+  return !c || c==='مشترك' || c===COLLEGE;
+}
 function retrieve(query,n=4){
   const qt=[...new Set(tokens(query))];
   if(!qt.length) return [];
 
-  const idx=KB.map(e=>({e,
+  const idx=KB.filter(e=>!isPdata(e)&&inCollege(e)).map(e=>({e,
     T:fieldTokens(e.title), G:fieldTokens(e.tags||''),
     A:fieldTokens(e.article||''), B:fieldTokens(e.body)}));
   const N=idx.length||1;
@@ -415,11 +672,10 @@ function retrieve(query,n=4){
   let ok=scored.filter(x=>x.s>0 && (x.cov>=need || x.best>=4)).sort((a,b)=>b.s-a.s);
   if(!ok.length) return [];
   /* إن ذُكر القسم: استبعد مدخلات خطط الأقسام الأخرى (تبقى اللائحة والعام) */
-  const wd=queryDept(query);
-  if(wd){
-    const f=ok.filter(x=>!isPlanEntry(x.e) || (x.e.dept||'').includes(wd) || (x.e.dept||'').includes('جميع'));
-    if(f.length) ok=f;
-  }
+  /* تصفية الخطط حسب مسار الطالب أو القسم/المسار المذكور في السؤال (تبقى اللوائح والأدلة) */
+  const pf=pathFilter(ok,query);
+  if(pf.length || effectivePath(query)===TRACK) ok=pf;
+  if(!ok.length) return [];
   const top=ok[0].s;
   return ok.filter(x=>x.s>=top*0.45).slice(0,n).map(x=>x.e);
 }
@@ -439,8 +695,23 @@ function bubble(role,html){
   d.innerHTML='<div class="bubble">'+html+'</div>';
   stream.appendChild(d); stream.scrollTop=stream.scrollHeight; return d;
 }
+function collegeButtonsHTML(){
+  return '<div class="chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
+    COLLEGES.map(c=>`<button class="chip" onclick="pickCollege('${c}')">كلية ${c}</button>`).join('')+
+    '</div>';
+}
+function pickCollege(c){
+  COLLEGE=c; try{ localStorage.setItem('murshid_college',c); }catch(e){}
+  if(c!=='الأعمال') savePath('');
+  bubble('bot','<p>تمام — أنت في <b>كلية '+c+'</b>. ستكون كل الإجابات وفق لوائح كليتك والإجراءات العامة المشتركة.</p><p>اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
+  if(qEl) qEl.focus();
+}
 function greet(){
-  bubble('bot','<p><b>أهلًا بك في المرشد الذكي.</b></p><p>أجيب عن أسئلتك الأكاديمية من واقع لوائح الجامعة وخططها الدراسية، وأذكر لك مصدر كل إجابة. اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
+  if(!COLLEGE){
+    bubble('bot','<p><b>أهلًا بك في المرشد الذكي.</b></p><p>قبل أن أجيبك، أخبرني بكليتك لأستدعي لوائحها الصحيحة:</p>'+collegeButtonsHTML());
+    return;
+  }
+  bubble('bot','<p><b>أهلًا بك في المرشد الذكي</b> — كلية '+COLLEGE+'.</p><p>أجيب عن أسئلتك الأكاديمية من واقع لوائح الجامعة وخططها الدراسية، وأذكر لك مصدر كل إجابة. اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
 }
 
 function bubble(role,html){
@@ -471,7 +742,7 @@ const COURTESY=[
  [['مع السلامه','الله يحفظك','باي','وداعا','في امان الله','الي اللقاء','تصبح علي خير'],
   '<p>في أمان الله، ووفّقك الله.</p>'],
  [['من انت','مين انت','وش تسوي','ايش تسوي','وش تقدر','ماذا تفعل','وظيفتك','عرف بنفسك','ايش هذا','ما هذا','وش هذا','ما هو هذا'],
-  '<p>أنا «المرشد الذكي»، مساعد إرشاد أكاديمي لطلاب كلية الأعمال بجامعة الجوف.</p><p>أجيب من نص لائحة الدراسة والاختبارات وقواعدها التنفيذية، وأذكر رقم المادة في كل إجابة. أما الحالات الفردية فمرجعها مرشدك الأكاديمي.</p>'],
+  '<p>أنا «المرشد الذكي»، مساعد إرشاد أكاديمي لطلاب جامعة الجوف (كلية الأعمال والكلية التطبيقية).</p><p>أجيب من لوائح الجامعة وأدلتها وخططها الدراسية، وأذكر مصدر كل إجابة. أما الحالات الفردية فمرجعها مرشدك الأكاديمي.</p>'],
  [['كيف الحال','كيفك','شخبارك','وش اخبارك','اخبارك','كيف حالك','عامل اي','عامل ايه','عامل إيه','ازيك','إزيك','اخبارك ايه','عاملين اي','كيف الامور','الامور طيبه','شلونك','شخبارك اليوم'],
   '<p>بخير والحمد لله، وأسأل الله أن تكون كذلك.</p><p>كيف أخدمك في أمورك الأكاديمية؟</p>']
 ];
@@ -537,14 +808,37 @@ async function ask(preset){
   if(!text) return;
   qEl.value=''; qEl.style.height='auto'; sendEl.disabled=true;
   bubble('me',esc(text));
+  /* أوامر التغيير */
+  const ntx=norm(text);
+  if(/^(تغيير|تغير|غير) (المسار|مساري|القسم|قسمي|التخصص|تخصصي)$/.test(ntx)){
+    savePath(''); bubble('bot','<p>اختر ما قُبلت عليه:</p>'+pathButtonsHTML());
+    sendEl.disabled=false; qEl.focus(); return;
+  }
+  if(/^(تغيير|تغير|غير) (الكليه|كليتي)$/.test(ntx)){
+    resetCollege(); bubble('bot','<p>اختر كليتك:</p>'+collegeButtonsHTML());
+    sendEl.disabled=false; qEl.focus(); return;
+  }
+
+  /* حاسبة الساعات المتبقية — حساب آلي من بيانات الخطة دون نموذج الذكاء الاصطناعي (لا يُحفظ ما يكتبه الطالب) */
+  const calc=calcHTML(text);
+  if(calc){
+    if(calc.needPath){
+      pendingPlan=text;
+      const d=bubble('bot','<p>لحساب الساعات المتبقية أحتاج أن أعرف ما قُبلت عليه. أنت مقبول على:</p>'+pathButtonsHTML()); topOf(d);
+      sendEl.disabled=false; qEl.focus(); return;
+    }
+    const d=bubble('bot',calc.html); topOf(d);
+    srvPost({action:'log',q:'[حاسبة الساعات]',found:-1,kind:'calc',device:DEVICE}).catch(()=>{});
+    sendEl.disabled=false; qEl.focus(); return;
+  }
 
   const greet = smalltalk(text);
   const hits  = greet? [] : retrieve(text);
 
-  /* سؤال خطط دون قسم → اسأل الطالب عن قسمه أولًا */
-  if(!greet && planAmbiguous(text, hits)){
+  /* سؤال مقررات/خطة دون مسار محفوظ → اسأل الطالب عمّا قُبل عليه (في كل المستويات) */
+  if(!greet && needsPath(text, hits)){
     pendingPlan=text;
-    const d=bubble('bot','<p>سؤالك عن الخطة الدراسية، وهي تختلف بين أقسام الكلية الثلاثة. أيّ قسم تقصد؟</p>'+deptButtonsHTML());
+    const d=bubble('bot','<p>سؤالك عن المقررات أو الخطة الدراسية، وهي تختلف حسب ما قُبلت عليه. أنت مقبول على:</p>'+pathButtonsHTML());
     topOf(d);
     srvPost({action:'log',q:text,found:-1,kind:'clarify',device:DEVICE}).catch(()=>{});
     sendEl.disabled=false; qEl.focus(); return;
@@ -559,10 +853,10 @@ async function ask(preset){
   if(greet){ answer=greet; chat=true; }
   else if(!hits.length){
     answer='<p>لا يتوفر لدي نص لائحي يجيب عن سؤالك.</p>'+
-           '<p>أرجو مراجعة مرشدك الأكاديمي أو وحدة شؤون الطلاب بكلية الأعمال. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
+           '<p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
   } else {
     try{
-      const j=await srvPost({action:'ask',q:text,
+      const j=await srvPost({action:'ask',q:text,college:COLLEGE,path:effectivePath(text),
         sources:hits.map(e=>({article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))});
       answer='<p>'+esc(j.text).replace(/\n+/g,'</p><p>')+'</p>';
     }catch(err){
@@ -644,7 +938,7 @@ async function boot(){
           : e.message);
     KB=cache('murshid_kb_cache')||[];
   }
-  st.textContent = KB.length? KB.length+' مادة نظامية' : 'غير متاح';
+  st.textContent = KB.length? KB.filter(e=>!isPdata(e)).length+' مادة نظامية' : 'غير متاح';
   if(!KB.length){
     setupBox(why); return;
   }
