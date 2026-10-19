@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
+<meta name="build" content="v4.0">
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
@@ -92,15 +94,33 @@ button{cursor:pointer;border:none;background:none}
 .bot .bubble p+p{margin-top:9px}
 
 /* البطاقة المرجعية — العنصر المميّز */
-.refs{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.refs{margin-top:2px}
+.refs>summary,.ref>summary{list-style:none;cursor:pointer;user-select:none}
+.refs>summary::-webkit-details-marker,.ref>summary::-webkit-details-marker{display:none}
+.refs>summary{
+  display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft);
+  border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:4px 12px
+}
+.refs>summary::before,.ref>summary::before{content:'›';display:inline-block;transform:rotate(-90deg);font-size:15px;line-height:1;transition:.15s}
+.refs[open]>summary::before,.ref[open]>summary::before{transform:rotate(90deg)}
+.refs>summary:hover{border-color:var(--primary);color:var(--primary)}
+.refs-in{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .ref{
   background:var(--paper);border:1px solid var(--line);border-inline-start:3px solid var(--gold);
-  border-radius:10px;padding:11px 13px;
+  border-radius:10px;padding:9px 13px;
 }
-.ref-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.ref>summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ref-art{font-weight:700;font-size:13px;color:var(--primary-deep)}
 .ref-src{font-size:11.5px;color:var(--ink-soft)}
-.ref-text{font-family:'Amiri',serif;font-size:15.5px;line-height:1.95;color:#2E2437}
+.ref-text{
+  font-family:'Amiri',serif;font-size:15px;line-height:1.9;color:#2E2437;
+  white-space:pre-line;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);
+  max-height:300px;overflow-y:auto
+}
+.bot .bubble ul,.bot .bubble ol{margin:6px 0;padding-inline-start:22px}
+.bot .bubble li{margin:3px 0}
+.bot .bubble .ah{font-weight:700;color:var(--primary-deep);margin-top:10px}
+.bot .bubble p:first-child{margin-top:0}
 .stamp{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.2px}
 .stamp.approved{background:#E7F3EE;color:var(--ok)}
 .stamp.draft{background:var(--gold-soft);color:var(--warn)}
@@ -225,8 +245,9 @@ html,body{height:100%;overflow:hidden}
 .disclaimer{flex:0 0 auto;padding:8px 12px}
 @media(max-width:640px){
   .chatwrap{max-width:100%;border:none;border-radius:0;box-shadow:none;background:var(--sand)}
-  .chips{gap:6px;padding:8px 12px;max-height:96px;overflow-y:auto;
+  #chips{gap:6px;padding:8px 12px;max-height:96px;overflow-y:auto;
     border-top:1px solid var(--line);background:var(--paper)}
+  .bubble .chips{gap:6px;padding:0}
   .chip{font-size:12.5px;padding:5px 11px}
   .topbar-in{padding:12px 14px 11px}
   .brand h1{font-size:17px}
@@ -259,7 +280,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية.</p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span style="display:block;opacity:.5;font-size:.92em;margin-top:2px">الإصدار ٤٫٠</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -643,9 +664,20 @@ function inCollege(e){
   const c=e.college||'';
   return !c || c==='مشترك' || c===COLLEGE;
 }
+/* سؤال تعريفي عن «المسار» دون ذكر قسم/تسويق/مالية ← المقصود نظام المسار المشترك: يُجاب من مدخل التعريف وحده */
+function isDefTrackQuery(q){
+  const t=norm(q);
+  return /(^| )(ال)?مسار(ات)?( |$)/.test(t)
+      && /(ما هو|ما هي|ما المقصود|ما معني|ماذا يعني|ايش يعني|وش يعني|يعني ايش|يعني وش|ايش هو|ايش هي|وش هو|وش هي|ما المراد|عرف|تعريف|اشرح|شرح)/.test(t)
+      && !/تسويق|ماليه|مالي |الماليه|تمويل|محاسب|اداره الاعمال|اختيار|مقرر|مستوي|خطه|قسم|وظيف|مهني|اكاديم|دراسي|تعليمي|مستقبل/.test(t+' ');
+}
 function retrieve(query,n=4){
   const qt=[...new Set(tokens(query))];
   if(!qt.length) return [];
+  if(isDefTrackQuery(query)){
+    const d=KB.find(e=>e.id==='trk_overview' && inCollege(e));
+    if(d) return [d];
+  }
 
   const idx=KB.filter(e=>!isPdata(e)&&inCollege(e)).map(e=>({e,
     T:fieldTokens(e.title), G:fieldTokens(e.tags||''),
@@ -764,16 +796,40 @@ function smalltalk(t){
   return null;
 }
 function refsHTML(list){
-  return '<div class="refs">'+list.map(e=>`
-    <div class="ref">
-      <div class="ref-head">
+  return '<details class="refs"><summary>المراجع النظامية ('+ar(list.length)+')</summary><div class="refs-in">'+list.map(e=>`
+    <details class="ref">
+      <summary>
         <span class="ref-art">${esc(e.article||e.title)}</span>
         <span class="ref-src">${esc(e.source||'')}</span>
         <span class="stamp ${e.status==='approved'?'approved':'draft'}">${e.status==='approved'?'معتمد':'مسودة'}</span>
-      </div>
+      </summary>
       <div class="ref-text">${esc(e.body)}</div>
-    </div>`).join('')+'</div>';
+    </details>`).join('')+'</div></details>';
 }
+/* عرض نص الإجابة: فقرات + نقاط + خطوات مرقّمة + عناوين قصيرة (بدون رموز ماركداون خام) */
+function fmtAnswer(t){
+  const inl=x=>esc(x).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  let out='', list=null;
+  const close=()=>{ if(list){ out+='</'+list+'>'; list=null; } };
+  String(t||'').replace(/\r/g,'').split('\n').forEach(raw=>{
+    const l=raw.trim(); if(!l){ close(); return; }
+    let m;
+    if((m=l.match(/^[-•*●▪]\s+(.+)$/))){
+      if(list!=='ul'){ close(); out+='<ul>'; list='ul'; } out+='<li>'+inl(m[1])+'</li>';
+    } else if((m=l.match(/^([0-9٠-٩]{1,2})\s*[.)\-–]\s*(.+)$/))){
+      if(list!=='ol'){ close(); out+='<ol start="'+(parseInt(latinDigits(m[1]),10)||1)+'">'; list='ol'; } out+='<li>'+inl(m[2])+'</li>';
+    } else {
+      close();
+      const h=l.match(/^#{1,4}\s*(.+)$/);
+      if(h) out+='<p class="ah">'+inl(h[1])+'</p>';
+      else if(/[:：]$/.test(l) && l.length<70) out+='<p class="ah">'+inl(l)+'</p>';
+      else out+='<p>'+inl(l)+'</p>';
+    }
+  });
+  close(); return out;
+}
+/* هل ردّ النموذج بالاعتذار الكامل («لا يتوفر لدي نص …»)؟ عندها لا تُعرض مراجع غير ذات صلة */
+function isRefusal(t){ return /^\s*(?:[«"]\s*)?لا يتوفر لدي نص/.test(String(t||'')); }
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 let pendingPlan=null;   /* يحمل سؤال الخطط بانتظار اختيار الطالب لقسمه */
@@ -798,9 +854,9 @@ async function srvPost(body){
 }
 
 function fullAnswer(botDiv, hits){
-  let t=(botDiv.querySelector('.bubble')?.innerText||'').trim();
+  let t=(botDiv.querySelector('.bubble')?.innerText||'').trim();   /* نص الإجابة فقط (المراجع تُسجَّل بأسمائها) */
   if(hits&&hits.length){ t+='\n\n— المصادر —';
-    hits.forEach(e=>{ t+='\n• '+(e.article||e.title||'')+(e.source?' ('+e.source+')':'')+' ['+(e.status==='approved'?'معتمد':'مسودة')+']\n'+(e.body||''); }); }
+    hits.forEach(e=>{ t+='\n• '+(e.article||e.title||'')+(e.source?' ('+e.source+')':'')+' ['+(e.status==='approved'?'معتمد':'مسودة')+']'; }); }
   return t;
 }
 async function ask(preset){
@@ -849,28 +905,31 @@ async function ask(preset){
   wait.innerHTML='<div class="bubble" style="padding:0"><div class="typing"><i></i><i></i><i></i></div></div>';
   stream.appendChild(wait); stream.scrollTop=stream.scrollHeight;
 
-  let answer='', chat=false;
+  let answer='', chat=false, refused=false;
   if(greet){ answer=greet; chat=true; }
   else if(!hits.length){
     answer='<p>لا يتوفر لدي نص لائحي يجيب عن سؤالك.</p>'+
            '<p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
   } else {
     try{
-      const j=await srvPost({action:'ask',q:text,college:COLLEGE,path:effectivePath(text),
+      const j=await srvPost({action:'ask',q:text,college:COLLEGE,path:isDefTrackQuery(text)?'':effectivePath(text),
         sources:hits.map(e=>({article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))});
-      answer='<p>'+esc(j.text).replace(/\n+/g,'</p><p>')+'</p>';
+      if(isRefusal(j.text)){
+        refused=true;
+        answer='<p>لا يتوفر لدي نص يجيب عن هذا.</p><p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
+      } else answer=fmtAnswer(j.text);
     }catch(err){
       const top=hits[0];
-      answer='<p>'+esc(top.body).replace(/\n+/g,'</p><p>')+'</p>'+
+      answer=fmtAnswer(top.body)+
              '<p style="color:#8a6d1f;font-size:.9em">(عُرض النص النظامي مباشرة؛ خدمة الصياغة الذكية مشغولة مؤقتًا — حاول مرة أخرى بعد قليل لصياغة أوضح.)</p>';
     }
   }
 
   wait.remove();
   const d=bubble('bot',answer);
-  if(hits.length) d.insertAdjacentHTML('beforeend', refsHTML(hits));
+  if(hits.length && !refused) d.insertAdjacentHTML('beforeend', refsHTML(hits));
 
-  if(!chat){
+  if(!chat && !refused){
     const id='r'+Date.now();
     d.insertAdjacentHTML('beforeend',
       `<div class="rate" id="${id}"><span>هل أفادتك الإجابة؟</span>
@@ -879,9 +938,9 @@ async function ask(preset){
   }
   topOf(d);
 
-  srvPost({action:'log',q:text,found:chat?-1:hits.length,kind:chat?'chat':'q',
+  srvPost({action:'log',q:text,found:chat?-1:(refused?0:hits.length),kind:chat?'chat':'q',
            articles:hits.map(x=>x.article).join(' | '),
-           answer:fullAnswer(d,hits),device:DEVICE}).catch(()=>{});
+           answer:fullAnswer(d,refused?[]:hits),device:DEVICE}).catch(()=>{});
   sendEl.disabled=false; qEl.focus();
 }
 
