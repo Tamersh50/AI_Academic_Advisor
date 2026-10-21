@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
-<meta name="build" content="v55">
+<meta name="build" content="v56">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -290,7 +290,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٥</span></p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٦</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -334,7 +334,7 @@ const SYN={};
  ['بريكوست','متطلب سابق'],['متطلب','متطلب سابق'],['سكشن','شعبة مقرر'],['دكتور','عضو هيئة تدريس'],
  ['ديجري','تقدير درجة'],['تخصص','قسم تحويل'],['ابغى','اريد'],['ودي','اريد'],['ايش','ما'],['وش','ما'],
  /* لهجة الطلاب ← المصطلح اللائحي */
- ['ترم','فصل'],['الترم','فصل'],['سمستر','فصل'],['اطلع','خروج'],['اخرج','خروج'],['اوجل','تاجيل'],['اجل','تاجيل'],['أأجل','تاجيل'],['يلغي','الغاء'],['الغى','الغاء'],['يبلغوني','ابلاغ استدعاء'],['يبلغني','ابلاغ استدعاء'],['اتحول','تحويل'],['احول','تحويل'],['انتقل','تحويل'],['يفصلني','فصل'],['انفصلت','فصل مفصول'],['تنزل','اعلان'],['ينزل','اعلان'],['سلسال','سلاسل'],['حلق','اقراط'],['ابي','اريد'],['ابى','اريد'],['اسوي','افعل'],['مو','غير'],['برا','خارج'],['الدكتور','عضو هيئة تدريس'],['الاكل','ماكولات'],['اكل','ماكولات'],['ضيع','فقدان'],['ضاعت','فقدان'],['ح','حرمان محروم'],['هـ','راسب'],['ل','غير مكتمل'],['م','مستمر'],['ع','اعتذار'],['dn','حرمان'],['ic','غير مكتمل'],['w','اعتذار']
+ ['يفصل','جامعه انذارات مفصول'],['ينفصل','جامعه انذارات مفصول'],['فصلوني','جامعه انذارات مفصول'],['ترم','فصل'],['الترم','فصل'],['سمستر','فصل'],['اطلع','خروج'],['اخرج','خروج'],['اوجل','تاجيل'],['اجل','تاجيل'],['أأجل','تاجيل'],['يلغي','الغاء'],['الغى','الغاء'],['يبلغوني','ابلاغ استدعاء'],['يبلغني','ابلاغ استدعاء'],['اتحول','تحويل'],['احول','تحويل'],['انتقل','تحويل'],['يفصلني','فصل'],['انفصلت','فصل مفصول'],['تنزل','اعلان'],['ينزل','اعلان'],['سلسال','سلاسل'],['حلق','اقراط'],['ابي','اريد'],['ابى','اريد'],['اسوي','افعل'],['مو','غير'],['برا','خارج'],['الدكتور','عضو هيئة تدريس'],['الاكل','ماكولات'],['اكل','ماكولات'],['ضيع','فقدان'],['ضاعت','فقدان'],['ح','حرمان محروم'],['هـ','راسب'],['ل','غير مكتمل'],['م','مستمر'],['ع','اعتذار'],['dn','حرمان'],['ic','غير مكتمل'],['w','اعتذار']
 ].forEach(([k,v])=>SYN[norm(k)]=norm(v));
 
 /* إزالة أدوات التعريف والعطف من أول الكلمة */
@@ -430,19 +430,27 @@ function resetCollege(){ COLLEGE=''; savePath(''); try{ localStorage.removeItem(
 /* ═══ مسار طالب كلية الأعمال: المسار المشترك أو أحد الأقسام ═══
    يُسأل الطالب مرة واحدة عند أول سؤال عن المقررات أو الخطة (في أي مستوى)، ويُحفظ اختياره.
    ذكر قسم أو المسار صراحةً في السؤال يسري على ذلك السؤال وحده. */
-const TRACK='مسار القبول الأعمال';
+const TRACK='مسار الأعمال';
+/* ترحيل اختيار محفوظ بالاسم القديم */
+if(PATH==='مسار القبول الأعمال'){ PATH=TRACK; try{ localStorage.setItem('murshid_path',TRACK); }catch(e){} }
 const PATHS=[TRACK,'المحاسبة','إدارة الأعمال','التمويل والاستثمار'];
 function isTrackEntry(e){ return (e.dept||'')==='مسار مشترك'; }
 /* مدخل «قائمة مقررات/خطة» — لا المداخل التعريفية العامة عن المسار */
 function isCourseEntry(e){ return isPlanEntry(e) || (isTrackEntry(e) && /مقررات|المستوى|الاختياري/.test(e.title||'')); }
-function queryTrack(text){ return /مسار القبول|المسار المشترك|مسار مشترك|المسارات المشترك|المسار الجديد/.test(norm(text)); }
+function queryTrack(text){
+  const t=norm(text);
+  if(/مسار القبول|مسار الاعمال|المسار المشترك|مسار مشترك|المسارات المشترك|المسار الجديد/.test(t)) return true;
+  /* «المسار» وحدها لطالب كلية الأعمال = المسار المشترك، ما لم يُذكر مسار التسويق أو المالية في إدارة الأعمال */
+  return /(^| )(ال|بال|وال|لل|فال)مسار(ات)?( |$)/.test(t) && !/مسار(ات)? (ال)?(تسويق|اداره|ماليه)/.test(t) && !queryDept(text);
+}
 function explicitPath(text){ return queryTrack(text) ? TRACK : queryDept(text); }
 function effectivePath(text){ return COLLEGE==='الأعمال' ? (explicitPath(text) || PATH || '') : ''; }
 function needsPath(text,hits){
   if(COLLEGE!=='الأعمال' || PATH || explicitPath(text)) return false;
-  if(hits.slice(0,2).some(isCourseEntry)) return true;
-  /* صياغة عن الخطة/المقررات مع وجود مدخل خطة ضمن النتائج */
-  return /خطه|مقرر|مستوي|مواد|ماده|متطلب/.test(norm(text)) && hits.some(isCourseEntry);
+  /* لا يُسأل الطالب عن قسمه إلا إن كان سؤاله عن الخطة أو المقررات فعلًا (لا لمجرد تشابه لفظي: «سلسال» ↔ «سلاسل الإمداد») */
+  const t=norm(text);
+  if(!/خطه|مقرر|مستوي|مواد|ماده|متطلب|ترم|كورس/.test(t) && !/\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(latinDigits(t))) return false;
+  return hits.some(isCourseEntry);
 }
 function pathFilter(ok,query){
   const ep=effectivePath(query); if(!ep) return ok;
@@ -614,7 +622,7 @@ function calcHTML(text,ctx){
   const ep=(ctx&&ctx.dept)||effectivePath(text);
   if(!ep){ return {needPath:true}; }
   if(ep===TRACK){ pendingCalc=false;
-    return {html:'<p>حساب الساعات المتبقية للتخرج غير متاح حاليًا لطلاب <b>مسار القبول الأعمال (المسار المشترك)</b>؛ فالمعتمد حتى الآن مقررات المستويين الأول والثاني فقط (٣٥ وحدة)، وأما خطة ما بعد التخصيص فسيتم إضافتها بمجرد اعتمادها من الجهات المختصة بالجامعة.</p><p>للاستفسار عن وضعك الحالي راجع سجلك الأكاديمي أو مرشدك الأكاديمي.</p>'}; }
+    return {html:'<p>حساب الساعات المتبقية للتخرج غير متاح حاليًا لطلاب <b>مسار الأعمال (المسار المشترك)</b>؛ فالمعتمد حتى الآن مقررات المستويين الأول والثاني فقط (٣٥ وحدة)، وأما خطة ما بعد التخصيص فسيتم إضافتها بمجرد اعتمادها من الجهات المختصة بالجامعة.</p><p>للاستفسار عن وضعك الحالي راجع سجلك الأكاديمي أو مرشدك الأكاديمي.</p>'}; }
   const plan=getPlan(ep);
   if(!plan){ pendingCalc=false; return {html:'<p>تعذّر تحميل بيانات خطة '+esc(ep)+' في الحاسبة. يرجى إبلاغ مسؤول النظام.</p>'}; }
   const D=parseCalc(src,plan);
@@ -967,7 +975,7 @@ function fullAnswer(botDiv, hits){
   return t;
 }
 /* ═══════════════ v5: إصدار الواجهة ومصافحة الخادم ═══════════════ */
-const CLIENT_VERSION='55';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
+const CLIENT_VERSION='56';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
 const SRV={version:null,count:null,emb:null,offline:false,pending:false};
 function arv(v){ return ar(v).replace('.','٫'); }
 function srvIsNew(){ return !!SRV.version && parseFloat(SRV.version)>=5; }
@@ -1145,7 +1153,18 @@ function applyRoute(text,R){
     const h=levelHTML(ep,R.level,text); return h?{html:h}:null;
   }
   if(R.intent==='course_info'){
-    if(!ep) return {needPath:true};
+    if(!ep){
+      /* بلا قسم محفوظ: إن ورد المقرر في خطة قسم واحد، أو بالبيانات نفسها في كل الأقسام، يُجاب مباشرة */
+      const found=PATHS.filter(p=>p!==TRACK).map(p=>({p:p,h:courseHTML(p,text,R.course||'')})).filter(x=>x.h && !/أكثر من مقرر/.test(x.h));
+      if(found.length===1) return {html:found[0].h};
+      if(found.length>1){
+        /* المقارنة على البيانات الأساسية (الوحدات، النوع، الموضع، المتطلب السابق)؛ ما يفتحه المقرر يختلف بين الأقسام فلا يُعرض */
+        const core=x=>x.h.replace(/<li>يُشترط سابقًا لـ:[^<]*<\/li>/g,'').split(' — قسم '+esc(x.p)).join('');
+        if(found.every(x=>core(x)===core(found[0])))
+          return {html:core(found[0]).replace('</ul>','</ul><p style="font-size:.92em">بالبيانات نفسها في خطط أقسام: '+found.map(x=>esc(x.p)).join('، ')+'.</p>')};
+      }
+      return {needPath:true};
+    }
     if(ep===TRACK) return null;
     const h=courseHTML(ep,text,R.course||''); return h?{html:h}:null;
   }
