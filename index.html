@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
-<meta name="build" content="v4.0">
+<meta name="build" content="v54">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -158,6 +158,11 @@ button{cursor:pointer;border:none;background:none}
   border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px
 }
 .disclaimer{text-align:center;font-size:11.5px;color:var(--ink-soft);padding:12px 8px 0}
+.verline{display:block;opacity:.6;font-size:.92em;margin-top:2px}
+@media (max-width:600px){ body.asked #chips{display:none} }   /* على الجوال: تختفي الاقتراحات بعد أول سؤال لتتسع المحادثة */
+.verline.warn{opacity:1;color:#a35a00;font-weight:700}
+.hdr-change{margin-inline-start:8px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:1px 9px;font-size:11px;font-family:inherit;cursor:pointer;opacity:1}
+.hdr-change:hover{background:rgba(255,255,255,.25)}
 
 /* ===== نماذج ===== */
 label{display:block;font-size:12.5px;font-weight:500;color:var(--ink-soft);margin-bottom:5px}
@@ -267,7 +272,7 @@ html,body{height:100%;overflow:hidden}
     <div class="crest-sep"></div>
     <div class="brand">
       <h1>المرشد الذكي</h1>
-      <p>كلية الأعمال — جامعة الجوف</p>
+      <p id="hdrSub">جامعة الجوف</p>
     </div>
     <button class="ver" id="kbstat" onclick="boot()" title="اضغط لتحديث اللوائح">جارٍ التحميل…</button>
   </div>
@@ -280,7 +285,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span style="display:block;opacity:.5;font-size:.92em;margin-top:2px">الإصدار ٤٫٠</span></p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٤</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -316,7 +321,7 @@ function norm(s){
     .replace(/\s+/g,' ').trim().toLowerCase();
 }
 /* الكلمات الشائعة — تمرّ على التطبيع نفسه حتى تُحذف فعلًا */
-const STOP=new Set(['في','من','على','عن','إلى','ما','ماذا','هل','هو','هي','أن','إن','إذا','كيف','متى','أين','لماذا','التي','الذي','مع','أو','و','ثم','كم','لي','لدي','عندي','يمكن','يمكنني','أستطيع','يجوز','ماهي','ماهو','بعد','قبل','هذا','هذه','ذلك','كل','أي','عندما','حتى','بين','لكن','عليّ','لو','قد','الطالب','طالب','أنا','عندهم','فيه','به','له'].map(w=>norm(w)));
+const STOP=new Set(['في','من','على','عن','إلى','ما','ماذا','هل','هو','هي','أن','إن','إذا','كيف','متى','أين','لماذا','التي','الذي','مع','أو','و','ثم','كم','لي','لدي','عندي','يمكن','يمكنني','أستطيع','يجوز','ماهي','ماهو','بعد','قبل','هذا','هذه','ذلك','كل','أي','عندما','حتى','بين','لكن','عليّ','لو','ايش','وش','شو','ليش','وين','شلون','ابغى','ودي','بدي','عايز','ممكن','سمحت','قد','الطالب','طالب','أنا','عندهم','فيه','به','له'].map(w=>norm(w)));
 
 const SYN={};
 [['gpa','معدل تراكمي'],['جي بي ايه','معدل تراكمي'],['انذار','انذار تحذير'],['رسوب','رسب راسب اعادة'],
@@ -340,13 +345,15 @@ function tokens(s){
 function fieldTokens(txt){ return norm(txt).split(' ').map(lite).filter(w=>w.length>1 && !STOP.has(w)); }
 
 /* درجة تطابق كلمة واحدة مع قائمة كلمات: ١ تطابق تام ← ٠ لا تطابق */
+const SKEL=new Map();   /* ذاكرة للهياكل: نتيجة مطابقة لما قبلها، أسرع بكثير */
+function skelC(w){ let v=SKEL.get(w); if(v===undefined){ v=skel(w); SKEL.set(w,v); } return v; }
 function tokMatch(q,list){
-  const qs=skel(q); let best=0;
+  const qs=skelC(q); let best=0;
   for(const t of list){
     if(t===q) return 1;
     if(q.length>=4 && (t.startsWith(q)||q.startsWith(t))) best=Math.max(best,.9);
     if(qs.length>=3){
-      const ts=skel(t);
+      const ts=skelC(t);
       if(ts.length<3) continue;              /* هيكل قصير أو فارغ لا يطابق شيئًا */
       if(ts===qs) best=Math.max(best,.85);
       else if(ts.startsWith(qs)||qs.startsWith(ts)) best=Math.max(best,.7);
@@ -365,7 +372,7 @@ function tokMatch(q,list){
    حتى لا تُطابَق كلمات مثل «الاستثمارية/المالية/الأعمال» الواردة في أسماء المقررات. */
 const DEPT_FORMS=[
   {name:'المحاسبة', forms:['محاسبه','المحاسبه']},
-  {name:'إدارة الأعمال', forms:['اداره الاعمال','ادارة اعمال','اداره اعمال','اداره الأعمال']},
+  {name:'إدارة الأعمال', forms:['اداره الاعمال','اداره اعمال']},
   {name:'التمويل والاستثمار', forms:['التمويل والاستثمار','تمويل واستثمار','التمويل','تمويل']}
 ];
 const DEPT_CUE=['قسم','تخصص','تخصصي','برنامج','مسار','مساري','بكالوريوس'];
@@ -412,7 +419,7 @@ function planAmbiguous(text, hits){
 }
 
 let PATH=(function(){ try{ return localStorage.getItem('murshid_path')||''; }catch(e){ return ''; } })();
-function savePath(p){ PATH=p||''; try{ PATH?localStorage.setItem('murshid_path',PATH):localStorage.removeItem('murshid_path'); }catch(e){} }
+function savePath(p){ PATH=p||''; try{ PATH?localStorage.setItem('murshid_path',PATH):localStorage.removeItem('murshid_path'); }catch(e){} try{ renderHeader(); }catch(e){} }
 function resetCollege(){ COLLEGE=''; savePath(''); try{ localStorage.removeItem('murshid_college'); }catch(e){} }
 
 /* ═══ مسار طالب كلية الأعمال: المسار المشترك أو أحد الأقسام ═══
@@ -447,7 +454,7 @@ function pickPath(p){
   savePath(p);
   bubble('bot','<p>تمام — ستكون إجابات المقررات والخطط وفق <b>'+pathLabel(p)+'</b>. ويمكنك تغييره في أي وقت بكتابة «تغيير المسار».</p>');
   const q=pendingPlan; pendingPlan=null;
-  if(q) ask(q);
+  if(q) ask(q,true);
 }
 
 
@@ -470,6 +477,8 @@ function getPlan(name){
 }
 /* هل السؤال عن الساعات/المقررات المتبقية؟ */
 function calcIntent(t){
+  /* «كم ساعة باقي على بداية الدراسة/الاختبار» سؤال عن وقت لا عن وحدات التخرج */
+  if(/(علي|على) (بدايه|بدء|الاختبار|اختبار|الامتحان|امتحان|المحاضره|الدوام|الدراسه|رمضان|الاجازه|اجازه|العيد|التسجيل|نهايه)/.test(t) && !/(تخرج|التخرج|اتخرج)/.test(t) && !DONE_RX.test(t)) return false;
   return /(ساعات|ساعه|وحدات|وحده|مواد|مقررات|مقرر|ماده)[^.؟?]{0,25}(المتبقي|الباقي|متبقي|باقي|تبقي|يتبقي|بقي|باقيه|متبقيه)/.test(t)
       || /(كم|ايش|وش|ما|ماذا|اعرف)[^.؟?]{0,20}(باقي|بقي|تبقي|يتبقي|متبقي)[^.؟?]{0,25}(تخرج|ساع|وحد|مواد|ماده|مقرر|الخطه)/.test(t)
       || /(احسب|حساب|حاسبه)[^.؟?]{0,20}(ساعات|الساعات|وحدات|المتبقي|الباقي|التخرج)/.test(t)
@@ -589,26 +598,27 @@ function trackOf(plan,codes,text){
   return {tr:plan.tracks[score[0]>score[1]?0:1], conflict:Math.min(...score)>0};
 }
 function liC(x){ return esc(x.n)+' ('+x.c+') — '+vU(x.u); }
-function calcHTML(text){
-  const T=cnorm(text);
-  const intent=calcIntent(T) || (/(المتبقي|الباقي|باقي|بقي|تبقي|يتبقي)/.test(T) && (DONE_RX.test(T) || /\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(T)));
+function calcHTML(text,ctx){
+  const src=(ctx&&ctx.text)||text;
+  const T=cnorm(src);
+  const intent=!!ctx || calcIntent(T) || (/(المتبقي|الباقي|باقي|بقي|تبقي|يتبقي)/.test(T) && (DONE_RX.test(T) || /\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(T)));
   if(!intent && !pendingCalc) return null;
   if(COLLEGE==='التطبيقية'){ pendingCalc=false;
     return {html:'<p>حساب الساعات المتبقية غير متاح حاليًا لبرامج <b>الكلية التطبيقية</b>، لأن خططها الدراسية لم تُضف بعد إلى قاعدة المعرفة.</p><p>يمكنك معرفة ما تبقى لك من سجلك الأكاديمي في بوابة الطالب، أو من مرشدك الأكاديمي.</p>'}; }
   if(!COLLEGE) return null;
-  const ep=effectivePath(text);
+  const ep=(ctx&&ctx.dept)||effectivePath(text);
   if(!ep){ return {needPath:true}; }
   if(ep===TRACK){ pendingCalc=false;
     return {html:'<p>حساب الساعات المتبقية للتخرج غير متاح حاليًا لطلاب <b>مسار القبول الأعمال (المسار المشترك)</b>؛ فالمعتمد حتى الآن مقررات المستويين الأول والثاني فقط (٣٥ وحدة)، وأما خطة ما بعد التخصيص فسيتم إضافتها بمجرد اعتمادها من الجهات المختصة بالجامعة.</p><p>للاستفسار عن وضعك الحالي راجع سجلك الأكاديمي أو مرشدك الأكاديمي.</p>'}; }
   const plan=getPlan(ep);
   if(!plan){ pendingCalc=false; return {html:'<p>تعذّر تحميل بيانات خطة '+esc(ep)+' في الحاسبة. يرجى إبلاغ مسؤول النظام.</p>'}; }
-  const D=parseCalc(text,plan);
+  const D=parseCalc(src,plan);
   const codes=[...new Set([...D.codes,...D.names])].filter(c=>!D.neg.includes(c));
   const hasB=codes.length>0||D.levels.length>0, hasA=D.num!==null && (intent||D.numStrong);
   if(!hasB && !hasA){
     if(pendingCalc && !intent){ pendingCalc=false; return null; }
     pendingCalc=true;
-    return {html:'<p><b>حاسبة الساعات المتبقية — قسم '+esc(ep)+'</b></p><p>أرسل لي أحد الأمرين:</p><p>١) <b>عدد الوحدات (الساعات) التي اجتزتها</b>، مثل: «اجتزت ٦٠ وحدة» — فأحسب لك المتبقي من مجموع الخطة.</p><p>٢) أو <b>المقررات التي نجحت فيها</b> برموزها أو أسمائها، مثل: «ACCT 1111، BUS 1111، BUS 1141»، أو «أنهيت المستوى الأول والثاني» — فأعطيك تفصيلًا بالمتبقي حسب المستوى ونوع المتطلب، وما يمكنك تسجيله الآن بحسب المتطلبات السابقة.</p>'};
+    return {prompt:true,html:'<p><b>حاسبة الساعات المتبقية — قسم '+esc(ep)+'</b></p><p>أرسل لي أحد الأمرين:</p><p>١) <b>عدد الوحدات (الساعات) التي اجتزتها</b>، مثل: «اجتزت ٦٠ وحدة» — فأحسب لك المتبقي من مجموع الخطة.</p><p>٢) أو <b>المقررات التي نجحت فيها</b> برموزها أو أسمائها، مثل: «ACCT 1111، BUS 1111، BUS 1141»، أو «أنهيت المستوى الأول والثاني» — فأعطيك تفصيلًا بالمتبقي حسب المستوى ونوع المتطلب، وما يمكنك تسجيله الآن بحسب المتطلبات السابقة.</p>'};
   }
   pendingCalc=false;
   const note='<p style="color:#8a6d1f;font-size:.9em">تنبيه: هذا حساب استرشادي من الخطة الدراسية المعتمدة لقسمك وفي حدود البيانات التي ذكرتها، ولا يشمل المعادلات أو المقررات المحوّلة أو المعفاة أو حالات الرسوب، ولا يُحفظ شيء مما كتبت. المرجع الرسمي سجلك الأكاديمي في بوابة الطالب ومرشدك الأكاديمي.</p>';
@@ -626,7 +636,7 @@ function calcHTML(text){
     return {html:h+note};
   }
   /* ── النمط (ب) ── */
-  const {tr,conflict}=trackOf(plan,codes,text);
+  const {tr,conflict}=trackOf(plan,codes,text+' '+src);
   const tracks=tr?[tr]:plan.tracks;
   const R=tracks.map(t=>calcTrack(t,codes,D.levels));
   const r=R[0];
@@ -665,13 +675,32 @@ function inCollege(e){
   return !c || c==='مشترك' || c===COLLEGE;
 }
 /* سؤال تعريفي عن «المسار» دون ذكر قسم/تسويق/مالية ← المقصود نظام المسار المشترك: يُجاب من مدخل التعريف وحده */
+/* عبارات المجاملة والنداء لا تدخل في البحث: «السلام عليكم يا دكتور، كم المكافأة» = «كم المكافأة» */
+const COURTESY_RX=new RegExp('(^| )('+['السلام عليكم ورحمه الله وبركاته','السلام عليكم ورحمه الله','السلام عليكم','سلام عليكم','وعليكم السلام',
+  'صباح الخير','مساء الخير','مرحبا','اهلا وسهلا','اهلا','هلا والله','هلا','حياك الله','حياكم الله',
+  'لو سمحت','لو سمحتي','لو سمحتم','من فضلك','من فضلكم','الله يعافيك','الله يعطيك العافيه','يعطيك العافيه','الله يسعدك','الله يجزاك خير','جزاك الله خير','تكفي','تكفون',
+  'يا دكتور','يا دكتوره','يا استاذ','يا استاذه','يا مرشد','يا مرشدي','يا شيخ','يا اخي','يا اخوي'].join('|')+')(?= |$)','g');
+function stripCourtesy(t){
+  const n=norm(t), s=(' '+n+' ').replace(COURTESY_RX,' ').replace(COURTESY_RX,' ').replace(/\s+/g,' ').trim();
+  return s.length>=2?s:n;
+}
 function isDefTrackQuery(q){
-  const t=norm(q);
+  const t=stripCourtesy(q);
+  if(/^(ايش|وش|شو|ما|ماهو|ماهي|ما هو|ما هي|ماذا) (ال)?مسار(ات)?( المشترك| المشتركه)?$/.test(t)) return true;
   return /(^| )(ال)?مسار(ات)?( |$)/.test(t)
       && /(ما هو|ما هي|ما المقصود|ما معني|ماذا يعني|ايش يعني|وش يعني|يعني ايش|يعني وش|ايش هو|ايش هي|وش هو|وش هي|ما المراد|عرف|تعريف|اشرح|شرح)/.test(t)
       && !/تسويق|ماليه|مالي |الماليه|تمويل|محاسب|اداره الاعمال|اختيار|مقرر|مستوي|خطه|قسم|وظيف|مهني|اكاديم|دراسي|تعليمي|مستقبل/.test(t+' ');
 }
+/* فهرس الحقول لكل مادة يُحسب مرة واحدة لكل نسخة من القاعدة */
+let IDX_KB=null, IDX_MAP=new Map();
+function idxOf(e){
+  if(IDX_KB!==KB){ IDX_KB=KB; IDX_MAP=new Map(); }
+  let o=IDX_MAP.get(e);
+  if(!o){ o={e:e,T:fieldTokens(e.title),G:fieldTokens(e.tags||''),A:fieldTokens(e.article||''),B:fieldTokens(e.body),NB:norm(e.body),mc:new Map()}; IDX_MAP.set(e,o); }
+  return o;
+}
 function retrieve(query,n=4){
+  query=stripCourtesy(query);
   const qt=[...new Set(tokens(query))];
   if(!qt.length) return [];
   if(isDefTrackQuery(query)){
@@ -679,22 +708,22 @@ function retrieve(query,n=4){
     if(d) return [d];
   }
 
-  const idx=KB.filter(e=>!isPdata(e)&&inCollege(e)).map(e=>({e,
-    T:fieldTokens(e.title), G:fieldTokens(e.tags||''),
-    A:fieldTokens(e.article||''), B:fieldTokens(e.body)}));
+  const idx=KB.filter(e=>!isPdata(e)&&inCollege(e)).map(idxOf);
   const N=idx.length||1;
 
-  /* وزن الندرة: الكلمة المتكررة في كل المواد لا تميّز شيئًا */
+  /* مطابقة كل كلمة مع حقول كل مادة مرة واحدة، ثم وزن الندرة: الكلمة المتكررة في كل المواد لا تميّز شيئًا */
+  const M=idx.map(o=>qt.map(w=>{ let r=o.mc.get(w); if(!r){ r=[tokMatch(w,o.T),tokMatch(w,o.G),tokMatch(w,o.A),tokMatch(w,o.B)]; o.mc.set(w,r); } return r; }));
   const df={};
-  qt.forEach(w=>{ df[w]=idx.filter(o=>tokMatch(w,[...o.T,...o.G,...o.B])>0).length; });
+  qt.forEach((w,k)=>{ df[w]=M.filter(r=>Math.max(r[k][0],r[k][1],r[k][3])>0).length; });
+  const nq=norm(query);
 
-  const scored=idx.map(o=>{
+  const scored=idx.map((o,i)=>{
     let s=0,hit=0,best=0;
-    qt.forEach(w=>{
-      const m=Math.max(tokMatch(w,o.T)*6, tokMatch(w,o.G)*4.5, tokMatch(w,o.A)*2, tokMatch(w,o.B)*2.2);
+    qt.forEach((w,k)=>{
+      const r=M[i][k], m=Math.max(r[0]*6, r[1]*4.5, r[2]*2, r[3]*2.2);
       if(m>0){ hit++; best=Math.max(best,m); s+=m*Math.log(1+N/Math.max(1,df[w])); }
     });
-    if(norm(query).length>8 && norm(o.e.body).includes(norm(query))) s+=10;
+    if(nq.length>8 && o.NB.includes(nq)) s+=10;
     if(o.e.status==='approved') s*=1.05;
     return {e:o.e, s, cov:hit/qt.length, best};
   });
@@ -729,28 +758,26 @@ function bubble(role,html){
 }
 function collegeButtonsHTML(){
   return '<div class="chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
-    COLLEGES.map(c=>`<button class="chip" onclick="pickCollege('${c}')">كلية ${c}</button>`).join('')+
+    COLLEGES.map(c=>`<button class="chip" data-college="1" onclick="pickCollege('${c}')">كلية ${c}</button>`).join('')+
     '</div>';
 }
 function pickCollege(c){
+  document.querySelectorAll('.chip[data-college]').forEach(b=>{ b.disabled=true; });
   COLLEGE=c; try{ localStorage.setItem('murshid_college',c); }catch(e){}
   if(c!=='الأعمال') savePath('');
-  bubble('bot','<p>تمام — أنت في <b>كلية '+c+'</b>. ستكون كل الإجابات وفق لوائح كليتك والإجراءات العامة المشتركة.</p><p>اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
-  if(qEl) qEl.focus();
+  renderHeader();
+  const q=pendingQuestion; pendingQuestion=null;
+  bubble('bot','<p>تمام — أنت في <b>كلية '+c+'</b>. ستكون كل الإجابات وفق لوائح كليتك والإجراءات العامة المشتركة.</p>'+(q?'':'<p>اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>'));
+  if(q) ask(q,true); else if(qEl) qEl.focus();
 }
 function greet(){
   if(!COLLEGE){
-    bubble('bot','<p><b>أهلًا بك في المرشد الذكي.</b></p><p>قبل أن أجيبك، أخبرني بكليتك لأستدعي لوائحها الصحيحة:</p>'+collegeButtonsHTML());
+    bubble('bot','<p><b>أهلًا بك في المرشد الذكي.</b></p><p>قبل أن أجيبك، اختر كليتك لأستدعي لوائحها الصحيحة:</p>'+collegeButtonsHTML());
     return;
   }
   bubble('bot','<p><b>أهلًا بك في المرشد الذكي</b> — كلية '+COLLEGE+'.</p><p>أجيب عن أسئلتك الأكاديمية من واقع لوائح الجامعة وخططها الدراسية، وأذكر لك مصدر كل إجابة. اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
 }
 
-function bubble(role,html){
-  const d=document.createElement('div'); d.className='msg '+role;
-  d.innerHTML='<div class="bubble">'+html+'</div>';
-  stream.appendChild(d); stream.scrollTop=stream.scrollHeight; return d;
-}
 const SUGGEST=["ما نسبة الغياب التي تحرمني من الاختبار؟", "كيف يُحسب المعدل التراكمي؟", "كيف أعتذر عن الفصل الدراسي؟", "ما شروط التحويل لتخصص آخر؟", "متى يكون الطالب راسبًا؟", "ما شروط مرتبة الشرف؟"];
 function renderChips(){
   document.getElementById('chips').innerHTML =
@@ -784,13 +811,15 @@ const FILLER=new Set(['يا','الله','طيب','اخوي','استاذ','دكت
 /* تحية أم سؤال؟ نحذف عبارة المجاملة وننظر إلى ما تبقّى */
 function smalltalk(t){
   const q=norm(t); if(q.length>80) return null;
-  for(const [pats,reply] of COURTESY){
+  for(let ci=0;ci<COURTESY.length;ci++){
+    const [pats,reply]=COURTESY[ci];
     const hit=pats.map(norm).find(pp=>q.includes(pp));
     if(!hit) continue;
     const restTxt=q.split(hit).join(' ');
     const rest=tokens(restTxt).filter(w=>!FILLER.has(w));
-    /* ما تبقّى يُعدّ سؤالًا فقط إذا وُجد له نص في اللائحة */
-    if(rest.length>=2 && retrieve(restTxt).length) return null;
+    /* ما تبقّى يُعدّ سؤالًا فقط إذا وُجد له نص في اللائحة. بعد التحية تكفي كلمة واحدة («السلام عليكم، كم المكافأة») */
+    const minRest=(ci===2||ci===3)?1:2;
+    if(rest.length>=minRest && retrieve(restTxt).length) return null;
     return reply;
   }
   return null;
@@ -853,99 +882,414 @@ async function srvPost(body){
   const j=await r.json(); if(!j.ok) throw new Error(j.error||'خطأ'); return j;
 }
 
+function refsText(t,hits){
+  if(hits&&hits.length){ t+='\n\n— المصادر —';
+    hits.forEach(e=>{ t+='\n• '+(e.article||e.title||'')+(e.source?' ('+e.source+')':'')+' ['+(e.status==='approved'?'معتمد':'مسودة')+']'; }); }
+  return t;
+}
 function fullAnswer(botDiv, hits){
   let t=(botDiv.querySelector('.bubble')?.innerText||'').trim();   /* نص الإجابة فقط (المراجع تُسجَّل بأسمائها) */
   if(hits&&hits.length){ t+='\n\n— المصادر —';
     hits.forEach(e=>{ t+='\n• '+(e.article||e.title||'')+(e.source?' ('+e.source+')':'')+' ['+(e.status==='approved'?'معتمد':'مسودة')+']'; }); }
   return t;
 }
-async function ask(preset){
-  const text = preset || qEl.value.trim();
-  if(!text) return;
-  qEl.value=''; qEl.style.height='auto'; sendEl.disabled=true;
-  bubble('me',esc(text));
-  /* أوامر التغيير */
-  const ntx=norm(text);
-  if(/^(تغيير|تغير|غير) (المسار|مساري|القسم|قسمي|التخصص|تخصصي)$/.test(ntx)){
-    savePath(''); bubble('bot','<p>اختر ما قُبلت عليه:</p>'+pathButtonsHTML());
-    sendEl.disabled=false; qEl.focus(); return;
-  }
-  if(/^(تغيير|تغير|غير) (الكليه|كليتي)$/.test(ntx)){
-    resetCollege(); bubble('bot','<p>اختر كليتك:</p>'+collegeButtonsHTML());
-    sendEl.disabled=false; qEl.focus(); return;
-  }
-
-  /* حاسبة الساعات المتبقية — حساب آلي من بيانات الخطة دون نموذج الذكاء الاصطناعي (لا يُحفظ ما يكتبه الطالب) */
-  const calc=calcHTML(text);
-  if(calc){
-    if(calc.needPath){
-      pendingPlan=text;
-      const d=bubble('bot','<p>لحساب الساعات المتبقية أحتاج أن أعرف ما قُبلت عليه. أنت مقبول على:</p>'+pathButtonsHTML()); topOf(d);
-      sendEl.disabled=false; qEl.focus(); return;
-    }
-    const d=bubble('bot',calc.html); topOf(d);
-    srvPost({action:'log',q:'[حاسبة الساعات]',found:-1,kind:'calc',device:DEVICE}).catch(()=>{});
-    sendEl.disabled=false; qEl.focus(); return;
-  }
-
-  const greet = smalltalk(text);
-  const hits  = greet? [] : retrieve(text);
-
-  /* سؤال مقررات/خطة دون مسار محفوظ → اسأل الطالب عمّا قُبل عليه (في كل المستويات) */
-  if(!greet && needsPath(text, hits)){
-    pendingPlan=text;
-    const d=bubble('bot','<p>سؤالك عن المقررات أو الخطة الدراسية، وهي تختلف حسب ما قُبلت عليه. أنت مقبول على:</p>'+pathButtonsHTML());
-    topOf(d);
-    srvPost({action:'log',q:text,found:-1,kind:'clarify',device:DEVICE}).catch(()=>{});
-    sendEl.disabled=false; qEl.focus(); return;
-  }
-
-  const wait=document.createElement('div');
-  wait.className='msg bot';
-  wait.innerHTML='<div class="bubble" style="padding:0"><div class="typing"><i></i><i></i><i></i></div></div>';
-  stream.appendChild(wait); stream.scrollTop=stream.scrollHeight;
-
-  let answer='', chat=false, refused=false;
-  if(greet){ answer=greet; chat=true; }
-  else if(!hits.length){
-    answer='<p>لا يتوفر لدي نص لائحي يجيب عن سؤالك.</p>'+
-           '<p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
-  } else {
-    try{
-      const j=await srvPost({action:'ask',q:text,college:COLLEGE,path:isDefTrackQuery(text)?'':effectivePath(text),
-        sources:hits.map(e=>({article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))});
-      if(isRefusal(j.text)){
-        refused=true;
-        answer='<p>لا يتوفر لدي نص يجيب عن هذا.</p><p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
-      } else answer=fmtAnswer(j.text);
-    }catch(err){
-      const top=hits[0];
-      answer=fmtAnswer(top.body)+
-             '<p style="color:#8a6d1f;font-size:.9em">(عُرض النص النظامي مباشرة؛ خدمة الصياغة الذكية مشغولة مؤقتًا — حاول مرة أخرى بعد قليل لصياغة أوضح.)</p>';
-    }
-  }
-
-  wait.remove();
-  const d=bubble('bot',answer);
-  if(hits.length && !refused) d.insertAdjacentHTML('beforeend', refsHTML(hits));
-
-  if(!chat && !refused){
-    const id='r'+Date.now();
-    d.insertAdjacentHTML('beforeend',
-      `<div class="rate" id="${id}"><span>هل أفادتك الإجابة؟</span>
-       <button onclick="rate('${id}',1,${JSON.stringify(text).replace(/"/g,'&quot;')})">نعم</button>
-       <button onclick="rate('${id}',0,${JSON.stringify(text).replace(/"/g,'&quot;')})">غير دقيقة</button></div>`);
-  }
-  topOf(d);
-
-  srvPost({action:'log',q:text,found:chat?-1:(refused?0:hits.length),kind:chat?'chat':'q',
-           articles:hits.map(x=>x.article).join(' | '),
-           answer:fullAnswer(d,refused?[]:hits),device:DEVICE}).catch(()=>{});
-  sendEl.disabled=false; qEl.focus();
+/* ═══════════════ v5: إصدار الواجهة ومصافحة الخادم ═══════════════ */
+const CLIENT_VERSION='54';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
+const SRV={version:null,count:null,emb:null,offline:false,pending:false};
+function arv(v){ return ar(v).replace('.','٫'); }
+function srvIsNew(){ return !!SRV.version && parseFloat(SRV.version)>=5; }
+function renderVerline(){
+  const el=document.getElementById('verline'); if(!el) return;
+  const n=KB.filter(e=>!isPdata(e)).length;
+  let s, warn='';
+  if(SRV.pending){ s='الإصدار '+arv(CLIENT_VERSION)+' · جارٍ التحقق من الخادم…'; }
+  else if(SRV.offline){ s='الإصدار '+arv(CLIENT_VERSION)+' · الخادم غير متصل'; warn='تعمل الصفحة على نسخة محفوظة من اللوائح'; }
+  else if(!SRV.version){ s='الواجهة '+arv(CLIENT_VERSION)+' · خادم قديم'; warn='نسخة الخادم (Code.gs) قديمة وتحتاج تحديثًا — أبلغ مسؤول النظام'; }
+  else if(String(SRV.version)!==String(CLIENT_VERSION)){ s='الواجهة '+arv(CLIENT_VERSION)+' · الخادم '+arv(SRV.version); warn='رقم إصدار الخادم لا يطابق الواجهة — أبلغ مسؤول النظام'; }
+  else s='الإصدار '+arv(CLIENT_VERSION);
+  s+=' · قاعدة '+ar(n)+' مادة'+(warn?' ⚠':'');
+  el.textContent=s; el.className=warn?'verline warn':'verline'; el.title=warn;
+}
+/* ═══════════════ v5: ترويسة ديناميكية واختيار الكلية/القسم ═══════════════ */
+function renderHeader(){
+  const el=document.getElementById('hdrSub'); if(!el) return;
+  if(!COLLEGE){ el.textContent='جامعة الجوف — اختر كليتك للبدء'; document.title='المرشد الذكي — جامعة الجوف'; return; }
+  let s='كلية '+COLLEGE;
+  const hasP=COLLEGE==='الأعمال' && !!PATH;
+  if(hasP) s+=' — '+(PATH===TRACK?'المسار المشترك':'قسم '+PATH);
+  el.innerHTML=esc(s)+' · جامعة الجوف <button class="hdr-change" onclick="startCollegePick()">تغيير الكلية</button>'+
+    (hasP?'<button class="hdr-change" onclick="startPathPick()">تغيير القسم</button>':'');
+  document.title='المرشد الذكي — كلية '+COLLEGE+'، جامعة الجوف';
+}
+function startCollegePick(){
+  resetCollege(); renderHeader();
+  const d=bubble('bot','<p>اختر كليتك:</p>'+collegeButtonsHTML()); topOf(d);
+}
+function startPathPick(){
+  savePath('');
+  const d=bubble('bot','<p>اختر ما قُبلت عليه:</p>'+pathButtonsHTML()); topOf(d);
 }
 
-function rate(id,val,q){
-  const box=document.getElementById(id);
+/* ═══════════════ v5: جداول الخطة من بيانات pdata (حتمية، بلا نموذج) ═══════════════ */
+const ORDW=['','الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن'];
+const TYL={'جامعة':'متطلب جامعة','كلية':'متطلب كلية','برنامج':'متطلب برنامج'};
+const PLAN_NOTE='<p style="color:#8a6d1f;font-size:.9em">من الخطة الدراسية المعتمدة لقسمك، للاسترشاد. المرجع الرسمي هو الخطة المعتمدة ومرشدك الأكاديمي.</p>';
+function planIndex(plan){
+  const map={};
+  plan.tracks.forEach((tr,ti)=>{
+    tr.levels.forEach((l,li)=>l.i.forEach(x=>{ if(!x.c) return;
+      const o=map[x.c]||(map[x.c]={x:x,where:[]}); o.where.push({tr:tr.track,pos:l.n,ti:ti,lv:li}); }));
+    Object.keys(tr.groups).forEach(g=>{ const G=tr.groups[g];
+      G.c.forEach(x=>{ const o=map[x.c]||(map[x.c]={x:x,where:[]});
+        o.where.push({tr:tr.track,pos:'اختياري ضمن «'+G.title+'»',ti:ti,group:g}); }); });
+  });
+  return map;
+}
+function reqTxt(idx,x){
+  const p=[];
+  if(x.p){ const y=idx[x.p]; p.push('المتطلب السابق: '+(y?esc(y.x.n)+' ('+x.p+')':esc(x.p))); }
+  if(x.pt) p.push('الشرط: '+esc(x.pt));
+  else if(x.pu) p.push('الشرط: اجتياز '+vU(x.pu)+' على الأقل');
+  if(x.co){ const y=idx[x.co]; p.push('يُسجَّل متزامنًا مع: '+(y?esc(y.x.n)+' ('+x.co+')':esc(x.co))); }
+  return p.join('؛ ');
+}
+function itemLine(idx,x){
+  if(!x.c) return esc(x.l||'مقرر اختياري')+' — '+vU(x.u);
+  const r=reqTxt(idx,x);
+  return '<b>'+esc(x.n)+'</b> ('+x.c+') — '+vU(x.u)+(x.t&&TYL[x.t]?' — '+TYL[x.t]:'')+
+    (r?'<br><span style="color:var(--ink-soft);font-size:.92em">'+r+'</span>':'');
+}
+function levelHTML(ep,k,text){
+  const plan=getPlan(ep); k=+k;
+  if(!plan || !(k>=1&&k<=8)) return null;
+  const idx=planIndex(plan), T=cnorm(text||'');
+  let trs=plan.tracks, picked=false;
+  if(trs.length>1){
+    const mk=/تسويق/.test(T), fn=/ماليه/.test(T);
+    if(mk!==fn){ const t=trs.find(t=>mk?/التسويق/.test(t.track):/المالية/.test(t.track)); if(t){ trs=[t]; picked=true; } }
+    else { const sig=t=>JSON.stringify((t.levels[k-1]||{}).i||[]); if(trs.every(t=>sig(t)===sig(trs[0]))) trs=[trs[0]]; }
+  }
+  const showTrack=trs.length>1||picked;
+  const parts=trs.map(tr=>{
+    const l=tr.levels[k-1]; if(!l) return '';
+    const sum=l.i.reduce((a,x)=>a+(x.u||0),0);
+    let h=(showTrack?'<p><b>'+esc(tr.track)+'</b> — ':'<p>')+esc(l.n)+' — مجموع الوحدات: <b>'+vU(sum)+'</b></p>';
+    h+='<ul>'+l.i.map(x=>'<li>'+itemLine(idx,x)+'</li>').join('')+'</ul>';
+    const slots=[...new Set(l.i.filter(x=>x.s).map(x=>x.s))];
+    slots.forEach(s=>{ const G=tr.groups[s]; if(!G) return;
+      h+='<details class="refs"><summary>خيارات: '+esc(G.title)+' ('+ar(G.c.length)+')</summary><div class="refs-in">'+
+         (G.rule?'<p style="font-size:.92em">'+esc(G.rule)+'</p>':'')+
+         '<ul>'+G.c.map(y=>'<li>'+esc(y.n)+' ('+y.c+') — '+vU(y.u)+'</li>').join('')+'</ul></div></details>'; });
+    return h;
+  }).filter(Boolean);
+  if(!parts.length) return null;
+  return '<p><b>مقررات قسم '+esc(ep)+' — المستوى '+ORDW[k]+'</b></p>'+parts.join('')+PLAN_NOTE;
+}
+function findCourseCodes(plan,idx,text,hint){
+  const src=(hint?hint+' ':'')+(text||'');
+  const T=cnorm(src);
+  const m=T.match(/\b([a-z]{2,5})\s*-?\s*(\d{4})\b/);
+  if(m){ const c=m[1].toUpperCase()+' '+m[2]; if(idx[c]) return [c]; }
+  /* ١) الاسم الكامل للمقرر ورد في السؤال (الأطول أولًا) */
+  const s=' '+wstrip(T)+' ';
+  let best=0, res=[];
+  Object.keys(idx).forEach(c=>{
+    const k=wstrip(cnorm(idx[c].x.n)); if(k.length<4) return;
+    if(s.indexOf(' '+k+' ')>=0){ if(k.length>best){ best=k.length; res=[c]; } else if(k.length===best) res.push(c); }
+  });
+  if(res.length || !hint) return res;
+  /* ٢) جزء من الاسم كما كتبه الطالب («محاسبة التكاليف» ← «نظم محاسبة التكاليف») */
+  const h=wstrip(cnorm(hint).replace(/(^| )(مقرر|ماده|مواد|متطلب|سابق|ماهو|ما هو|ايش|وش)(?= |$)/g,' ').replace(/\s+/g,' ').trim());
+  if(h.length<5) return [];
+  const part=Object.keys(idx).filter(c=>(' '+wstrip(cnorm(idx[c].x.n))+' ').indexOf(' '+h+' ')>=0);
+  part.partial=true; return part;
+}
+function courseHTML(ep,text,hint){
+  const plan=getPlan(ep); if(!plan) return null;
+  const idx=planIndex(plan), codes=findCourseCodes(plan,idx,text,hint);
+  if(!codes.length) return null;
+  if(codes.partial && codes.length>1)
+    return '<p>وجدتُ في خطة قسم '+esc(ep)+' أكثر من مقرر يطابق ما كتبت:</p><ul>'+codes.slice(0,10).map(c=>'<li>'+esc(idx[c].x.n)+' ('+c+')</li>').join('')+'</ul><p>اكتب اسم المقرر كاملًا أو رمزه (مثل '+codes[0]+') لأعرض لك متطلبه ووحداته ومستواه.</p>';
+  const blocks=codes.slice(0,4).map(c=>{
+    const o=idx[c], x=o.x;
+    const poss=[...new Set(o.where.map(w=>w.pos))];
+    let where;
+    if(poss.length===1) where=poss[0];
+    else where=o.where.map(w=>esc(w.tr)+': '+esc(w.pos)).join('؛ ');
+    const deps=Object.keys(idx).filter(d=>idx[d].x.p===c||idx[d].x.co===c).map(d=>esc(idx[d].x.n)+' ('+d+')');
+    let h='<p><b>'+esc(x.n)+'</b> ('+c+') — قسم '+esc(ep)+'</p><ul>'+
+      '<li>الوحدات: '+vU(x.u)+'</li>'+
+      (x.t&&TYL[x.t]?'<li>النوع: '+TYL[x.t]+'</li>':'')+
+      '<li>موضعه في الخطة: '+(poss.length===1?esc(where):where)+'</li>';
+    const r=reqTxt(idx,x);
+    h+='<li>'+(r?r.split('؛ ').join('</li><li>'):'لا متطلب سابق له')+'</li>';
+    if(deps.length) h+='<li>يُشترط سابقًا لـ: '+[...new Set(deps)].join('، ')+'</li>';
+    return h+'</ul>';
+  });
+  return blocks.join('')+PLAN_NOTE;
+}
+
+/* ═══════════════ v5: الموجّه (فهم الصياغة الحرة) ═══════════════ */
+let ROUTER_FAILS=0, ROUTER_DOWN=false; const ROUTE_CACHE={};
+function routerOK(){ return !ROUTER_DOWN && srvIsNew() && !SRV.offline && !!COLLEGE && (typeof routerAllowed!=='function' || routerAllowed()); }
+function withTimeout(p,ms){ return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]); }
+/* لا نستدعي الموجّه إلا إن لمح السؤال إلى حساب/خطة/مقرر — توفيرًا للحصة */
+function routeWorthy(text){
+  if(COLLEGE!=='الأعمال') return false;
+  const T=cnorm(text);
+  if(!/(مقرر|مقررات|ماده|مواد|ساعات|ساعه|وحدات|وحده|مستوي|ترم|فصل|خطه|جدول|متطلب)/.test(T) && !/\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(T)) return false;
+  return /(المتبقي|الباقي|باقي|بقي|تبقي|يتبقي|متبقي|اتخرج|التخرج|انهيت|اجتزت|خلصت|نجحت|درست|اكملت|اتممت|انجزت|متطلب|ادرس|بدرس|ابدرس|اسجل|يفتح|قبل|بعد|شرط|ناقص|نقص|منجز|انجاز|حققت|كملت|اكتمل|تبقي|كم لي|كم علي)/.test(T)
+      || /(مستوي|ترم|فصل)\s*(ال)?(\d|اول|ثاني|ثالث|رابع|خامس|سادس|سابع|ثامن)/.test(T)
+      || /\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(T);
+}
+async function routeFor(text,showWait,rk){
+  rk=rk||{}; if(!routerOK()) return null;
+  const key=text+'|'+(rk.extra&&rk.extra.model||'');
+  if(!rk.noCache && Object.prototype.hasOwnProperty.call(ROUTE_CACHE,key)) return ROUTE_CACHE[key];
+  if(showWait) showWait();
+  let R=null;
+  try{
+    const j=await withTimeout(srvPost(Object.assign({action:'route',q:text,college:COLLEGE,path:effectivePath(text)},rk.extra||{})),9000);
+    R=j.route||null; ROUTER_FAILS=0;
+  }catch(e){ if(++ROUTER_FAILS>=2) ROUTER_DOWN=true; }
+  ROUTE_CACHE[key]=R; return R;
+}
+function applyRoute(text,R){
+  if(!R || COLLEGE!=='الأعمال') return null;
+  const ep=(R.dept && PATHS.indexOf(R.dept)>=0) ? R.dept : effectivePath(text);
+  if(R.intent==='calc'){
+    const sy=[];
+    if(R.units_passed!=null) sy.push('اجتزت '+R.units_passed+' وحدة');
+    if(R.levels_done && R.levels_done.length) sy.push('أنهيت المستوى '+R.levels_done.map(k=>ORDW[k]).join(' و'));
+    if(R.courses_done && R.courses_done.length) sy.push('اجتزت '+R.courses_done.join('، '));
+    if(!sy.length) return null;
+    const c=calcHTML(text,{text:sy.join('. '),dept:ep});
+    return (c && !c.prompt) ? c : null;
+  }
+  if(R.intent==='plan_level' && R.level){
+    if(!ep) return {needPath:true};
+    if(ep===TRACK) return null;
+    const h=levelHTML(ep,R.level,text); return h?{html:h}:null;
+  }
+  if(R.intent==='course_info'){
+    if(!ep) return {needPath:true};
+    if(ep===TRACK) return null;
+    const h=courseHTML(ep,text,R.course||''); return h?{html:h}:null;
+  }
+  return null;
+}
+
+/* ═══════════════ v5: توسيع المداخل المتجاورة (جزء ١/٢/٣ من موضوع واحد) ═══════════════ */
+function expandSiblings(hits){
+  const out=hits.slice(); let added=0;
+  hits.slice(0,2).forEach(e=>{
+    const m=(e.id||'').match(/^(.*)_(\d+)$/); if(!m) return;
+    const pre=m[1]+'_';
+    KB.filter(x=>x!==e && !isPdata(x) && inCollege(x) && (x.id||'').indexOf(pre)===0 && /^\d+$/.test(x.id.slice(pre.length)))
+      .sort((a,b)=>parseInt(a.id.slice(pre.length),10)-parseInt(b.id.slice(pre.length),10))
+      .forEach(x=>{ if(added<2 && out.indexOf(x)<0){ out.push(x); added++; } });
+  });
+  return out.slice(0,6);
+}
+/* استرجاع كامل (للاختبار الآلي أيضًا): بحث نصي + توسيع المتجاورات */
+function gather(text){ return expandSiblings(retrieve(text)); }
+
+/* ═══════════════ v5: بحث هجين بالتضمينات (اختياري، معطّل افتراضيًا من لوحة التحكم) ═══════════════ */
+let EMB={ready:false};
+const EMB_MIN=0.55;
+function hashSig(e){
+  const f=v=>String(v==null?'':v);
+  const s=f(e.id)+'|'+f(e.title)+'|'+f(e.article)+'|'+f(e.tags)+'|'+f(e.body);
+  let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))|0; }
+  return (h>>>0).toString(36);
+}
+async function loadEmb(){
+  EMB={ready:false};
+  try{
+    if(!(srvIsNew() && SRV.emb && SRV.emb.on && SRV.emb.ready)) return;
+    const r=await fetch(serverUrl()+'?action=emb&_='+Date.now(),{cache:'no-store'});
+    const j=await r.json();
+    if(!j.ok || !j.emb || !j.emb.length) return;
+    const byId={}; KB.forEach(e=>{ byId[e.id]=e; });
+    const map={}; let okN=0;
+    j.emb.forEach(o=>{
+      const e=byId[o.i]; if(!e || isPdata(e) || o.s!==hashSig(e)) return;
+      const bin=atob(o.v), a=new Int8Array(bin.length);
+      for(let i=0;i<bin.length;i++) a[i]=(bin.charCodeAt(i)<<24)>>24;
+      map[o.i]=a; okN++;
+    });
+    const need=KB.filter(e=>!isPdata(e)).length;
+    if(okN<need*0.9) return;          /* بصمات قديمة: التضمينات لا تطابق القاعدة الحالية فلا تُستعمل */
+    EMB={ready:true,map:map,dims:j.dims};
+  }catch(e){ EMB={ready:false}; }
+}
+async function hybrid(text,lex){
+  if(!EMB.ready || isDefTrackQuery(text)) return lex;
+  let qv=null;
+  try{ const j=await withTimeout(srvPost({action:'embedq',q:text}),5000); qv=j.v; }catch(e){ return lex; }
+  if(!qv || qv.length!==EMB.dims) return lex;
+  const sims=[];
+  KB.forEach(e=>{ const a=EMB.map[e.id]; if(!a || !inCollege(e)) return;
+    let s=0; for(let i=0;i<a.length;i++) s+=a[i]*qv[i]; sims.push({e:e,s:s/127}); });
+  sims.sort((a,b)=>b.s-a.s);
+  let top=sims.slice(0,8).filter(x=>x.s>=EMB_MIN);
+  const pf=pathFilter(top.map(x=>({e:x.e})),text);
+  top=top.filter(x=>pf.some(y=>y.e===x.e));
+  if(!top.length) return lex;
+  const score=new Map();
+  retrieve(text,8).forEach((e,i)=>score.set(e,(score.get(e)||0)+1/(60+i)));
+  top.forEach((x,i)=>score.set(x.e,(score.get(x.e)||0)+1/(60+i)));
+  return [...score.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);
+}
+
+let busy=false, pendingQuestion=null;
+async function ask(preset,replay){
+  if(busy) return;
+  const text = preset || qEl.value.trim();
+  if(!text) return;
+  busy=true;
+  try{ await askRun(text,!!replay); }
+  catch(err){
+    try{ console.error(err); }catch(_){}
+    bubble('bot','<p>حدث خطأ غير متوقع في الصفحة. حدّثها (Ctrl+F5) وأعد المحاولة، وإن تكرر فأبلغ مسؤول النظام.</p>');
+  }
+  finally{ busy=false; sendEl.disabled=false; qEl.focus(); }
+}
+const PATH_Q={calc:'لحساب الساعات المتبقية أحتاج أن أعرف ما قُبلت عليه. أنت مقبول على:',
+              plan:'سؤالك عن المقررات أو الخطة الدراسية، وهي تختلف حسب ما قُبلت عليه. أنت مقبول على:'};
+function askServer(text,hits,extra){
+  return srvPost(Object.assign({action:'ask',q:text,college:COLLEGE,path:isDefTrackQuery(text)?'':effectivePath(text),
+    sources:hits.map(e=>({id:e.id,article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))},extra||{}));
+}
+const REFUSE_HTML='<p>لا يتوفر لدي نص يجيب عن هذا.</p><p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
+
+/* ═══ خط المعالجة الكامل للسؤال (بلا واجهة): تستعمله الصفحة نفسها وفحص لوحة التحكم، فلا اختلاف بين ما يُختبر وما يراه الطالب ═══
+   opt: {showWait, model, token (تجاوز نموذج للمشرف فقط), noCache}. يُفترض أن الكلية محددة. */
+async function resolveQuestion(text,opt){
+  opt=opt||{}; const showWait=opt.showWait||function(){};
+  const extra=opt.model?{model:opt.model,token:opt.token}:{};
+  const rk={extra:extra,noCache:!!opt.noCache};
+
+  /* ١) الحاسبة المحلية — سريعة ولا تستهلك حصة النموذج */
+  const calc=calcHTML(text);
+  if(calc && calc.needPath) return {type:'needpath',kind:'calc'};
+  if(calc && calc.html && !calc.prompt) return {type:'html',html:calc.html,kind:'calc',logQ:'[حاسبة الساعات]'};
+
+  const stt=smalltalk(text);
+
+  /* ٢) الموجّه: صياغة حرة لحساب/مستوى/مقرر */
+  let R=null;
+  if(!stt && routerOK() && (routeWorthy(text) || (calc && calc.prompt))){
+    R=await routeFor(text,showWait,rk);
+    const rr=applyRoute(text,R);
+    if(rr){
+      const isCalc=R.intent==='calc';
+      if(rr.needPath) return {type:'needpath',kind:isCalc?'calc':'plan',route:R};
+      if(rr.html) return {type:'html',html:rr.html,kind:isCalc?'calc':'plan',route:R,
+                          logQ:isCalc?'[حاسبة الساعات]':'[جدول الخطة] '+text.slice(0,120)};
+    }
+  }
+  if(calc) return {type:'html',html:calc.html,kind:'calc',logQ:'[حاسبة الساعات]'};
+  if(stt) return {type:'chat',html:stt};
+
+  /* ٣) الاسترجاع */
+  let hits=retrieve(text);
+  if(!hits.length && routerOK()){
+    if(!R) R=await routeFor(text,showWait,rk);
+    if(R && R.search_query) hits=retrieve(R.search_query);
+  } else if(R && R.intent==='qa' && R.search_query && hits.length<4){
+    retrieve(R.search_query).forEach(e=>{ if(hits.indexOf(e)<0) hits.push(e); });
+  }
+  if(EMB.ready){ showWait(); hits=await hybrid(text,hits); }
+  hits=expandSiblings(hits);
+
+  /* سؤال مقررات/خطة دون مسار محفوظ → اسأل الطالب عمّا قُبل عليه */
+  if(needsPath(text,hits)) return {type:'needpath',kind:'plan',route:R,hits:hits};
+  if(!hits.length) return {type:'refuse',html:'<p>لا يتوفر لدي نص لائحي يجيب عن سؤالك.</p>'+
+      '<p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>',hits:[],used:[],route:R,nohits:true};
+
+  showWait();
+  let used=hits;
+  try{
+    const j=await (opt.askFn||askServer)(text,hits,extra);
+    if(j.none) return {type:'answer',html:'<p>هذه النصوص النظامية المتعلقة بسؤالك:</p>',used:hits,hits:hits,route:R,text:''};
+    const u=Array.isArray(j.used)?j.used.map(id=>hits.find(e=>e.id===id)).filter(Boolean):[];
+    if(u.length) used=u;
+    const meta={hits:hits,route:R,model:j.model,verified:j.verified,answered:j.answered,text:j.text||''};
+    if(j.answered===false || (j.answered===undefined && isRefusal(j.text)))
+      return Object.assign(meta,{type:'refuse',html:REFUSE_HTML,used:[]});
+    if(j.fallback==='source'){
+      const src=used[0]||hits[0];
+      return Object.assign(meta,{type:'answer',fallback:'source',unsupported:j.unsupported||[],used:[src],
+        html:'<p style="color:#8a6d1f;font-size:.9em">تعذّر التأكد من دقة أرقام الصياغة الآلية، فأعرض لك النص النظامي كما ورد:</p>'+fmtAnswer(src.body)});
+    }
+    return Object.assign(meta,{type:'answer',used:used,html:fmtAnswer(j.text)});
+  }catch(err){
+    const top=hits[0];
+    return {type:'answer',degraded:true,err:String(err&&err.message||err),hits:hits,used:[top],route:R,text:'',
+      html:fmtAnswer(top.body)+'<p style="color:#8a6d1f;font-size:.9em">(عُرض النص النظامي مباشرة؛ خدمة الصياغة الذكية مشغولة مؤقتًا — حاول مرة أخرى بعد قليل لصياغة أوضح.)</p>'};
+  }
+}
+
+async function askRun(text,replay){
+  qEl.value=''; qEl.style.height='auto'; sendEl.disabled=true;
+  if(!replay) bubble('me',esc(text));
+  document.body.classList.add('asked');
+  let wait=null;
+  const showWait=()=>{ if(wait) return;
+    wait=document.createElement('div'); wait.className='msg bot';
+    wait.innerHTML='<div class="bubble" style="padding:0"><div class="typing"><i></i><i></i><i></i></div></div>';
+    stream.appendChild(wait); stream.scrollTop=stream.scrollHeight; };
+  const hideWait=()=>{ if(wait){ wait.remove(); wait=null; } };
+  try{
+    const ntx=norm(text);
+    /* أوامر تغيير الكلية */
+    if(/^(تغيير|تغير|غير) (الكليه|كليتي)$/.test(ntx)){ startCollegePick(); return; }
+
+    /* ═ بوابة الكلية: لا إجابة قبل معرفة الكلية ═ */
+    if(!COLLEGE){
+      const st0=smalltalk(text);
+      if(st0){ const d=bubble('bot',st0+'<p>وقبل أن نبدأ، اختر كليتك:</p>'+collegeButtonsHTML()); topOf(d); return; }
+      pendingQuestion=text;
+      const d=bubble('bot','<p>قبل أن أجيبك أحتاج أن أعرف كليتك، فلكل كلية لوائحها وخططها:</p>'+collegeButtonsHTML()); topOf(d);
+      return;
+    }
+    if(/^(تغيير|تغير|غير) (المسار|مساري|القسم|قسمي|التخصص|تخصصي)$/.test(ntx)){ startPathPick(); return; }
+
+    const logQ=(q,kind)=>srvPost({action:'log',q:q,found:-1,kind:kind,device:DEVICE}).catch(()=>{});
+    const r=await resolveQuestion(text,{showWait:showWait});
+    hideWait();
+
+    if(r.type==='needpath'){
+      pendingPlan=text;
+      const d=bubble('bot','<p>'+PATH_Q[r.kind]+'</p>'+pathButtonsHTML()); topOf(d);
+      if(r.kind==='plan') logQ(text,'clarify');
+      return;
+    }
+    if(r.type==='html'){ const d=bubble('bot',r.html); topOf(d); logQ(r.logQ,r.kind); return; }
+
+    const chat=r.type==='chat', refused=r.type==='refuse';
+    const d=bubble('bot',r.html);
+    const ansText=fullAnswer(d,[]);            /* نص الإجابة وحده قبل إضافة المراجع وأزرار التقييم */
+    const shown=(!chat && !refused)?(r.used||[]):[];
+    if(shown.length) d.insertAdjacentHTML('beforeend', refsHTML(shown));
+    if(!chat && !refused) d.insertAdjacentHTML('beforeend', rateHTML(text));
+    topOf(d);
+    srvPost({action:'log',q:text,found:chat?-1:(refused?0:shown.length),kind:chat?'chat':'q',
+             articles:shown.map(x=>x.article).join(' | '),
+             answer:refsText(ansText,shown),device:DEVICE}).catch(()=>{});
+  } finally { hideWait(); }
+}
+
+const RATE_Q={};   /* نص السؤال لكل زر تقييم — لا يوضع النص داخل خاصية onclick */
+function rateHTML(text){
+  const id='r'+Date.now()+Math.random().toString(36).slice(2,6); RATE_Q[id]=text;
+  return `<div class="rate" id="${id}"><span>هل أفادتك الإجابة؟</span>
+         <button onclick="rate('${id}',1)">نعم</button>
+         <button onclick="rate('${id}',0)">غير دقيقة</button></div>`;
+}
+function rate(id,val){
+  const q=RATE_Q[id]||''; const box=document.getElementById(id); if(!box) return;
   box.querySelectorAll('button').forEach(b=>b.classList.remove('picked'));
   box.querySelectorAll('button')[val?0:1].classList.add('picked');
   srvPost({action:'log',q:q,found:'',kind:'q',rate:val,device:DEVICE}).catch(()=>{});
@@ -976,33 +1320,53 @@ function saveUrl(){
 }
 function clearUrl(){ try{ localStorage.removeItem('murshid_server'); }catch(e){} boot(); }
 
+function kbError(e){
+  return e.message==='EMPTY'
+    ? 'قاعدة المعرفة على الخادم فارغة. على مسؤول النظام رفعها من لوحة التحكم عبر «نشر ما في جهازي إلى الخادم».'
+    : (e.message==='Failed to fetch'
+        ? 'تعذّر الوصول إلى الخادم. تحقق من الإنترنت، ومن صحة الرابط، ومن أن النشر مضبوط على Anyone.'
+        : e.message);
+}
+async function fetchKB(){
+  const r=await fetch(serverUrl()+'?action=kb&_='+Date.now(),{cache:'no-store'});
+  if(!r.ok) throw new Error('استجابة الخادم: رمز '+r.status);
+  let j; try{ j=await r.json(); }
+  catch(e){ throw new Error('الرابط لا يعيد بيانات — تأكد أنه ينتهي بـ /exec وأن النشر مضبوط على Anyone'); }
+  if(!j.ok) throw new Error(j.error||'رفض الخادم الطلب');
+  if(!j.kb || !j.kb.length) throw new Error('EMPTY');
+  return j;
+}
+function applyKB(j){
+  KB=j.kb; cache('murshid_kb_cache',KB);
+  SRV.version=j.version!=null?String(j.version):null; SRV.count=j.count||null; SRV.emb=j.emb||null; SRV.offline=false; SRV.pending=false;
+}
+function kbStat(){ document.getElementById('kbstat').textContent = KB.length? ar(KB.filter(e=>!isPdata(e)).length)+' مادة نظامية' : 'غير متاح'; }
+let BOOT_ID=0;
 async function boot(){
-  stream.innerHTML=''; renderChips(); qEl.disabled=sendEl.disabled=false;
+  const myBoot=++BOOT_ID;
+  stream.innerHTML=''; renderChips(); qEl.disabled=sendEl.disabled=false; document.body.classList.remove('asked');
+  pendingQuestion=null; pendingPlan=null; renderHeader();
+  ROUTER_FAILS=0; ROUTER_DOWN=false;
   const st=document.getElementById('kbstat');
   if(!serverUrl()){ st.textContent='غير مهيّأ'; setupBox('لم يُضبط رابط الخادم بعد.'); return; }
+  const cached=cache('murshid_kb_cache');
+  if(Array.isArray(cached) && cached.length){
+    /* بدء فوري من النسخة المحفوظة، ثم تحديث صامت من الخادم */
+    KB=cached; SRV.pending=true; SRV.version=null; SRV.offline=false;
+    kbStat(); renderVerline(); renderHeader(); greet();
+    try{ const j=await fetchKB(); if(myBoot!==BOOT_ID) return; applyKB(j); }
+    catch(e){ if(myBoot!==BOOT_ID) return; SRV.pending=false; SRV.offline=true; toast('تُستخدم نسخة محفوظة — '+kbError(e).slice(0,60)); }
+    kbStat(); renderVerline(); loadEmb();
+    return;
+  }
   let why='';
-  try{
-    const r=await fetch(serverUrl()+'?action=kb&_='+Date.now(),{cache:'no-store'});
-    if(!r.ok) throw new Error('استجابة الخادم: رمز '+r.status);
-    let j; try{ j=await r.json(); }
-    catch(e){ throw new Error('الرابط لا يعيد بيانات — تأكد أنه ينتهي بـ /exec وأن النشر مضبوط على Anyone'); }
-    if(!j.ok) throw new Error(j.error||'رفض الخادم الطلب');
-    if(!j.kb || !j.kb.length) throw new Error('EMPTY');
-    KB=j.kb; cache('murshid_kb_cache',KB);
-  }catch(e){
-    why = e.message==='EMPTY'
-      ? 'قاعدة المعرفة على الخادم فارغة. على مسؤول النظام رفعها من نسخة المشرف عبر زر «رفع القاعدة إلى الخادم».'
-      : (e.message==='Failed to fetch'
-          ? 'تعذّر الوصول إلى الخادم. تحقق من الإنترنت، ومن صحة الرابط، ومن أن النشر مضبوط على Anyone.'
-          : e.message);
-    KB=cache('murshid_kb_cache')||[];
-  }
-  st.textContent = KB.length? KB.filter(e=>!isPdata(e)).length+' مادة نظامية' : 'غير متاح';
-  if(!KB.length){
-    setupBox(why); return;
-  }
-  if(why) toast('تُستخدم نسخة محفوظة — '+why.slice(0,60));
-  bubble('bot','<p><b>أهلًا بك في المرشد الذكي.</b></p><p>أجيب عن أسئلتك الأكاديمية من واقع لوائح الجامعة وخططها الدراسية، وأذكر لك مصدر كل إجابة. اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
+  try{ applyKB(await fetchKB()); }
+  catch(e){ SRV.version=null; SRV.offline=true; SRV.pending=false; why=kbError(e); KB=[]; }
+  if(myBoot!==BOOT_ID) return;
+  kbStat(); renderVerline(); renderHeader();
+  if(!KB.length){ setupBox(why); return; }
+  greet();
+  loadEmb();
 }
 boot();
 </script>
