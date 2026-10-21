@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
-<meta name="build" content="v54">
+<meta name="build" content="v55">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -159,7 +159,12 @@ button{cursor:pointer;border:none;background:none}
 }
 .disclaimer{text-align:center;font-size:11.5px;color:var(--ink-soft);padding:12px 8px 0}
 .verline{display:block;opacity:.6;font-size:.92em;margin-top:2px}
-@media (max-width:600px){ body.asked #chips{display:none} }   /* على الجوال: تختفي الاقتراحات بعد أول سؤال لتتسع المحادثة */
+@media (max-width:600px){ body.asked #chips{display:none} }
+.topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:12px 0 6px}
+.topic{border:1px solid var(--line);background:var(--paper);color:var(--primary-deep);border-radius:12px;padding:9px 10px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;text-align:center;line-height:1.4;transition:.15s}
+.topic:hover{border-color:var(--primary);background:var(--primary-tint);color:var(--primary)}
+.hint-line{font-size:12px;color:var(--ink-soft);margin-top:6px}
+@media (max-width:600px){ .topics{grid-template-columns:repeat(2,1fr)} .topic{font-size:12.5px;padding:8px 6px} }   /* على الجوال: تختفي الاقتراحات بعد أول سؤال لتتسع المحادثة */
 .verline.warn{opacity:1;color:#a35a00;font-weight:700}
 .hdr-change{margin-inline-start:8px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:1px 9px;font-size:11px;font-family:inherit;cursor:pointer;opacity:1}
 .hdr-change:hover{background:rgba(255,255,255,.25)}
@@ -285,7 +290,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٤</span></p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٥</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -756,32 +761,100 @@ function bubble(role,html){
   d.innerHTML='<div class="bubble">'+html+'</div>';
   stream.appendChild(d); stream.scrollTop=stream.scrollHeight; return d;
 }
+/* ═══════════════ الترحيب وشبكة المواضيع والاقتراحات ═══════════════
+   شرط ثابت: كل سؤال هنا نجح في الفحص الحي على الخادم (تقرير 2026-10-21)، ما عدا زر الحاسبة فهو حساب آلي من الخطة لا يمر على النموذج.
+   عند إضافة سؤال: شغّل الفحص الحي أولًا، ولا تضفه إلا إن نجح. */
+function collegeName(c){ return c==='التطبيقية' ? 'الكلية التطبيقية' : 'كلية '+c; }
+const TOPICS={
+  'الأعمال':[
+    ['المكافأة','كم المكافأة'],
+    ['الغياب والحرمان','كم نسبة الغياب المسموحة'],
+    ['الأعذار','غبت عن الاختبار النهائي بعذر وش اسوي'],
+    ['الاختبارات','ماذا احضر معي للاختبار'],
+    ['زي الطلاب','هل لازم البس ثوب وشماغ'],
+    ['زي الطالبات','وش اللبس المسموح للطالبات'],
+    ['الاعتذار عن الفصل','كيف اعتذر عن الفصل'],
+    ['الحذف والإضافة','متى فترة الحذف والاضافة'],
+    ['المعدل','كيف احسب معدلي'],
+    ['الإنذار والفصل','كم انذار يفصلني'],
+    ['مرتبة الشرف','ما شروط مرتبة الشرف'],
+    ['التظلم والاعتراض','كيف اعترض على درجة الاختبار الفصلي'],
+    ['السلوك والعقوبات','وش عقوبة الغش'],
+    ['التقويم الأكاديمي','متى الاختبارات النهائية للفصل الاول'],
+    ['المسار المشترك','ما هو المسار'],
+    ['الإرشاد الأكاديمي','متى اقابل المرشد'],
+    ['التحويل','ابي اتحول من تخصص لتخصص'],
+    ['حاسبة الساعات','كم باقي لي على التخرج؟']
+  ],
+  'التطبيقية':[
+    ['المكافأة','كم المكافأة'],
+    ['الغياب','كم نسبة الغياب المسموحة'],
+    ['الاعتذار عن الفصل','كيف اعتذر عن الفصل'],
+    ['العبء الدراسي','كم ساعة اسجل في الترم'],
+    ['الفرصة الرابعة','ما هي الفرصة الرابعة'],
+    ['التحويل بين البرامج','كيف اتحول بين برامج الدبلوم'],
+    ['السلوك والعقوبات','وش عقوبة الغش'],
+    ['إعادة القيد','انقطعت عن الدراسة كيف ارجع'],
+    ['شروط القبول','وش شروط القبول في الكلية التطبيقية'],
+    ['التقويم الأكاديمي','متى الاختبارات النهائية للفصل الثاني'],
+    ['مرافقة الزوج المبتعث','مرافقة زوجي المبتعث']
+  ]
+};
+const SUGGEST_POOL={
+  'الأعمال':['كم المكافأة','وش شروط المكافأة','متى تنزل مكافأة التفوق وكم قيمتها','كم نسبة الغياب المسموحة','هل يمكن رفع الحرمان',
+    'غبت عن الاختبار النهائي بعذر وش اسوي','هل يقبل التقرير الطبي من مستشفى خاص','ماذا احضر معي للاختبار','اذا تأخرت عن الاختبار كم دقيقة مسموح',
+    'هل مسموح الجوال في الاختبار','كم مدة الاختبار النهائي','كم درجة الفصلي وكم درجة النهائي','متى تنزل النتائج النهائية','كيف اعتذر عن الفصل',
+    'كيف اؤجل الدراسة','كيف انسحب من مقرر','متى فترة الحذف والاضافة','كم ساعة اقدر اسجل','كيف احسب معدلي','كم انذار يفصلني',
+    'ما شروط مرتبة الشرف','ما هي التقديرات واوزانها','كيف اعترض على درجة الاختبار الفصلي','وش عقوبة الغش','هل لازم البس ثوب وشماغ',
+    'وش اللبس المسموح للطالبات','متى الاختبارات النهائية للفصل الاول','ما هو المسار','متى اتخصص','متى اقابل المرشد','كيف ادخل قائمة العميد',
+    'ابي اتحول من تخصص لتخصص','كم ساعة خطة المحاسبة','ما هي حقوقي كطالب','ابي اسجل مواد صيفي'],
+  'التطبيقية':['كم المكافأة','ما هي المكافأة المقدمة للطلاب','كم نسبة الغياب المسموحة','كيف اعتذر عن الفصل','كم ساعة اسجل في الترم',
+    'معدلي 2.5 كم ساعة اقدر اسجل','ما هي الفرصة الرابعة','ما هي الفرص المتاحة بعد الفصل','كيف اتحول بين برامج الدبلوم','ابي اتحول لفرع ثاني',
+    'وش عقوبة الغش','انقطعت عن الدراسة كيف ارجع','وش شروط القبول في الكلية التطبيقية','متى الاختبارات النهائية للفصل الثاني','مرافقة زوجي المبتعث']
+};
+const ASKED=new Set();
+function qBtn(cls,label,q){ return '<button class="'+cls+'" data-q="'+esc(q)+'" title="'+esc(q)+'" onclick="ask(this.dataset.q)">'+esc(label)+'</button>'; }
+function topicsHTML(){
+  const T=TOPICS[COLLEGE]||[];
+  return '<div class="topics">'+T.map(([t,q])=>qBtn('topic',t,q)).join('')+'</div>';
+}
 function collegeButtonsHTML(){
   return '<div class="chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
-    COLLEGES.map(c=>`<button class="chip" data-college="1" onclick="pickCollege('${c}')">كلية ${c}</button>`).join('')+
+    COLLEGES.map(c=>`<button class="chip" data-college="1" onclick="pickCollege('${c}')">${collegeName(c)}</button>`).join('')+
     '</div>';
+}
+function welcomeHTML(back){
+  return '<p><b>'+(back?'أهلًا بعودتك':'مرحبًا بك')+' في '+collegeName(COLLEGE)+'.</b></p>'+
+    '<p>اسألني بأسلوبك — بالفصحى أو بالعامية — وسأجيبك من اللوائح الرسمية مع ذكر المادة التي استندت إليها. أو اختر موضوعًا:</p>'+
+    topicsHTML()+
+    '<p class="hint-line">للحالات الفردية يبقى مرشدك الأكاديمي هو المرجع.</p>';
 }
 function pickCollege(c){
   document.querySelectorAll('.chip[data-college]').forEach(b=>{ b.disabled=true; });
   COLLEGE=c; try{ localStorage.setItem('murshid_college',c); }catch(e){}
   if(c!=='الأعمال') savePath('');
-  renderHeader();
+  renderHeader(); renderChips();
   const q=pendingQuestion; pendingQuestion=null;
-  bubble('bot','<p>تمام — أنت في <b>كلية '+c+'</b>. ستكون كل الإجابات وفق لوائح كليتك والإجراءات العامة المشتركة.</p>'+(q?'':'<p>اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>'));
-  if(q) ask(q,true); else if(qEl) qEl.focus();
+  if(q){ bubble('bot','<p>تمام — أنت في <b>'+collegeName(c)+'</b>. ستكون كل الإجابات وفق لوائح كليتك والإجراءات العامة المشتركة.</p>'); ask(q,true); }
+  else { const d=bubble('bot',welcomeHTML(false)); topOf(d); if(qEl) qEl.focus(); }
 }
 function greet(){
+  renderChips();
   if(!COLLEGE){
-    bubble('bot','<p><b>أهلًا بك في المرشد الذكي.</b></p><p>قبل أن أجيبك، اختر كليتك لأستدعي لوائحها الصحيحة:</p>'+collegeButtonsHTML());
+    bubble('bot','<p><b>أهلًا بك في المرشد الذكي</b> — مساعدك للإرشاد الأكاديمي بجامعة الجوف.</p>'+
+      '<p>أجيبك من اللوائح والأدلة الرسمية مباشرة، وأذكر لك المادة التي استندت إليها.</p>'+
+      '<p><b>لنبدأ: اختر كليتك</b></p>'+collegeButtonsHTML());
     return;
   }
-  bubble('bot','<p><b>أهلًا بك في المرشد الذكي</b> — كلية '+COLLEGE+'.</p><p>أجيب عن أسئلتك الأكاديمية من واقع لوائح الجامعة وخططها الدراسية، وأذكر لك مصدر كل إجابة. اسألني عن الإنذار، الاعتذار، التحويل، المعدل، الحذف والإضافة، أو أي إجراء أكاديمي.</p>');
+  bubble('bot',welcomeHTML(true));
 }
-
-const SUGGEST=["ما نسبة الغياب التي تحرمني من الاختبار؟", "كيف يُحسب المعدل التراكمي؟", "كيف أعتذر عن الفصل الدراسي؟", "ما شروط التحويل لتخصص آخر؟", "متى يكون الطالب راسبًا؟", "ما شروط مرتبة الشرف؟"];
+/* شريط الاقتراحات: ٦ أسئلة ناجحة تتجدد بعد كل إجابة، دون تكرار ما سأله الطالب */
 function renderChips(){
-  document.getElementById('chips').innerHTML =
-    SUGGEST.map(s=>`<button class="chip" onclick="ask('${s}')">${s}</button>`).join('');
+  const box=document.getElementById('chips'); if(!box) return;
+  const pool=(SUGGEST_POOL[COLLEGE]||[]).filter(q=>!ASKED.has(q));
+  const pick=[]; const a=pool.slice();
+  while(pick.length<6 && a.length){ pick.push(a.splice(Math.floor(Math.random()*a.length),1)[0]); }
+  box.innerHTML=pick.map(q=>qBtn('chip',q,q)).join('');
 }
 const qEl=document.getElementById('q'), sendEl=document.getElementById('send');
 qEl.addEventListener('input',()=>{qEl.style.height='auto';qEl.style.height=Math.min(qEl.scrollHeight,130)+'px';});
@@ -894,7 +967,7 @@ function fullAnswer(botDiv, hits){
   return t;
 }
 /* ═══════════════ v5: إصدار الواجهة ومصافحة الخادم ═══════════════ */
-const CLIENT_VERSION='54';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
+const CLIENT_VERSION='55';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
 const SRV={version:null,count:null,emb:null,offline:false,pending:false};
 function arv(v){ return ar(v).replace('.','٫'); }
 function srvIsNew(){ return !!SRV.version && parseFloat(SRV.version)>=5; }
@@ -914,12 +987,12 @@ function renderVerline(){
 function renderHeader(){
   const el=document.getElementById('hdrSub'); if(!el) return;
   if(!COLLEGE){ el.textContent='جامعة الجوف — اختر كليتك للبدء'; document.title='المرشد الذكي — جامعة الجوف'; return; }
-  let s='كلية '+COLLEGE;
+  let s=collegeName(COLLEGE);
   const hasP=COLLEGE==='الأعمال' && !!PATH;
   if(hasP) s+=' — '+(PATH===TRACK?'المسار المشترك':'قسم '+PATH);
   el.innerHTML=esc(s)+' · جامعة الجوف <button class="hdr-change" onclick="startCollegePick()">تغيير الكلية</button>'+
     (hasP?'<button class="hdr-change" onclick="startPathPick()">تغيير القسم</button>':'');
-  document.title='المرشد الذكي — كلية '+COLLEGE+'، جامعة الجوف';
+  document.title='المرشد الذكي — '+collegeName(COLLEGE)+'، جامعة الجوف';
 }
 function startCollegePick(){
   resetCollege(); renderHeader();
@@ -1234,6 +1307,7 @@ async function resolveQuestion(text,opt){
 async function askRun(text,replay){
   qEl.value=''; qEl.style.height='auto'; sendEl.disabled=true;
   if(!replay) bubble('me',esc(text));
+  ASKED.add(text);
   document.body.classList.add('asked');
   let wait=null;
   const showWait=()=>{ if(wait) return;
@@ -1278,7 +1352,7 @@ async function askRun(text,replay){
     srvPost({action:'log',q:text,found:chat?-1:(refused?0:shown.length),kind:chat?'chat':'q',
              articles:shown.map(x=>x.article).join(' | '),
              answer:refsText(ansText,shown),device:DEVICE}).catch(()=>{});
-  } finally { hideWait(); }
+  } finally { hideWait(); renderChips(); }
 }
 
 const RATE_Q={};   /* نص السؤال لكل زر تقييم — لا يوضع النص داخل خاصية onclick */
