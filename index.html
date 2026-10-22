@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
-<meta name="build" content="v57">
+<meta name="build" content="v58">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -293,7 +293,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٧</span></p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٨</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -1088,7 +1088,7 @@ function fullAnswer(botDiv, hits){
   return t;
 }
 /* ═══════════════ v5: إصدار الواجهة ومصافحة الخادم ═══════════════ */
-const CLIENT_VERSION='57';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
+const CLIENT_VERSION='58';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
 const SRV={version:null,count:null,emb:null,offline:false,pending:false};
 function arv(v){ return ar(v).replace('.','٫'); }
 function srvIsNew(){ return !!SRV.version && parseFloat(SRV.version)>=5; }
@@ -1364,7 +1364,13 @@ const PATH_Q={calc:'لحساب الساعات المتبقية أحتاج أن �
               plan:'سؤالك عن المقررات أو الخطة الدراسية، وهي تختلف حسب ما قُبلت عليه. أنت مقبول على:'};
 function askServer(text,hits,extra){
   return srvPost(Object.assign({action:'ask',q:text,college:COLLEGE,path:isDefTrackQuery(text)?'':effectivePath(text),
-    sources:hits.map(e=>({id:e.id,article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))},extra||{}));
+    sources:hits.map(e=>({id:e.id,article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))},extra||{}))
+    .then(j=>{
+      /* الخادم الحديث يعيد دائمًا answered؛ غيابه يعني ردًّا ناقصًا (انقطع الطلب بعد مهلة Google فعاد بغير الإجابة)،
+         فيُعامل خطأً: يُعرض النص النظامي بدل فقاعة فارغة، ويعيد الفحص المحاولة */
+      if(srvIsNew() && typeof j.answered!=='boolean') throw new Error('استجابة غير مكتملة من الخادم (انتهت المهلة)');
+      return j;
+    });
 }
 /* تلميح سؤال المتابعة: إن اعتُذر عن سؤال قصير معلّق على ما قبله، يُنبَّه الطالب لكتابته كاملًا (لا يغيّر البحث ولا الإجابة) */
 let LAST_Q='';
