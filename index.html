@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
-<meta name="build" content="v56">
+<meta name="build" content="v57">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -125,7 +125,10 @@ button{cursor:pointer;border:none;background:none}
 .stamp.approved{background:#E7F3EE;color:var(--ok)}
 .stamp.draft{background:var(--gold-soft);color:var(--warn)}
 
-.rate{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink-soft);margin-top:4px}
+.rate{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin-top:4px}
+.rate-note{flex-basis:100%;display:flex;gap:6px;margin-top:2px}
+.rate-note input{flex:1;min-width:0;border:1px solid var(--line);border-radius:9px;padding:5px 9px;font:inherit;font-size:12.5px;background:var(--paper);color:var(--ink)}
+.rate-note.done{color:var(--ok)}
 .rate button{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:3px 11px;font-size:12px;transition:.15s}
 .rate button:hover{border-color:var(--primary);color:var(--primary)}
 .rate button.picked{background:var(--primary);color:#fff;border-color:var(--primary)}
@@ -290,7 +293,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٦</span></p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٧</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -308,6 +311,8 @@ function serverUrl(){
 
 let KB=[];
 /* معرّف جهاز مجهول (عشوائي، بلا هوية أو IP أو موقع) — لتمييز تكرار نفس الجهاز فقط */
+/* رقم المحادثة: رقم عشوائي لكل فتح للصفحة، في الذاكرة فقط (لا يُحفظ في المتصفح ولا يعرّف الطالب) — لقراءة أسئلة المحادثة الواحدة متتابعة في السجل */
+const CONV='c'+Math.random().toString(36).slice(2,9);
 let DEVICE=(function(){ try{ let d=localStorage.getItem('murshid_device'); if(!d){ d='d_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('murshid_device',d);} return d; }catch(e){ return ''; } })();
 const COLLEGES=['الأعمال','التطبيقية'];
 let COLLEGE=(function(){ try{ return localStorage.getItem('murshid_college')||''; }catch(e){ return ''; } })();
@@ -448,9 +453,12 @@ function effectivePath(text){ return COLLEGE==='الأعمال' ? (explicitPath(
 function needsPath(text,hits){
   if(COLLEGE!=='الأعمال' || PATH || explicitPath(text)) return false;
   /* لا يُسأل الطالب عن قسمه إلا إن كان سؤاله عن الخطة أو المقررات فعلًا (لا لمجرد تشابه لفظي: «سلسال» ↔ «سلاسل الإمداد») */
-  const t=norm(text);
-  if(!/خطه|مقرر|مستوي|مواد|ماده|متطلب|ترم|كورس/.test(t) && !/\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(latinDigits(t))) return false;
-  return hits.some(isCourseEntry);
+  const t=norm(text), course=hits.filter(isCourseEntry);
+  if(!course.length) return false;
+  if(/خطه|مقرر|مستوي|مواد|ماده|متطلب|ترم|كورس|تدريب|تعاوني/.test(t) || /\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(latinDigits(t))) return true;
+  /* بلا كلمة خطة صريحة: يُسأل فقط إن كانت أول نتيجة وأغلب النتائج من مواد الخطط (مثل «التدريب ساعه وحده؟»)،
+     لا لمجرد ظهور مادة خطة بين النتائج (مثل «سلسال» ↔ «سلاسل الإمداد») */
+  return isCourseEntry(hits[0]) && course.length*2>=hits.length;
 }
 function pathFilter(ok,query){
   const ep=effectivePath(query); if(!ep) return ok;
@@ -474,7 +482,7 @@ function pickPath(p){
 /* ═══ حاسبة الساعات المتبقية للتخرج — حساب آلي من بيانات الخطة (pdata_) دون نموذج ذكاء اصطناعي ═══
    النمط (أ): الطالب يذكر عدد الوحدات التي اجتازها ← المتبقي = مجموع الخطة − المجتاز.
    النمط (ب): الطالب يذكر المقررات (رموزًا أو أسماءً) أو المستويات التي أنهاها ← تفصيل كامل.
-   إذا توفر الاثنان يُعتمد (ب). لا يُحفظ شيء من بيانات الطالب. */
+   إذا توفر الاثنان يُعتمد (ب). لا يُحفظ نص رسالة الطالب؛ يُسجَّل ملخص ما فهمته الحاسبة فقط (القسم والعدد أو رموز المقررات والنتيجة). */
 function isPdata(e){ return /^pdata_/.test(e.id||''); }
 let pendingCalc=false;
 const CALC_AR='٠١٢٣٤٥٦٧٨٩';
@@ -617,12 +625,12 @@ function calcHTML(text,ctx){
   const intent=!!ctx || calcIntent(T) || (/(المتبقي|الباقي|باقي|بقي|تبقي|يتبقي)/.test(T) && (DONE_RX.test(T) || /\b[a-z]{2,5}\s*-?\s*\d{4}\b/.test(T)));
   if(!intent && !pendingCalc) return null;
   if(COLLEGE==='التطبيقية'){ pendingCalc=false;
-    return {html:'<p>حساب الساعات المتبقية غير متاح حاليًا لبرامج <b>الكلية التطبيقية</b>، لأن خططها الدراسية لم تُضف بعد إلى قاعدة المعرفة.</p><p>يمكنك معرفة ما تبقى لك من سجلك الأكاديمي في بوابة الطالب، أو من مرشدك الأكاديمي.</p>'}; }
+    return {sum:'[حاسبة الساعات] الكلية التطبيقية — غير متاحة',html:'<p>حساب الساعات المتبقية غير متاح حاليًا لبرامج <b>الكلية التطبيقية</b>، لأن خططها الدراسية لم تُضف بعد إلى قاعدة المعرفة.</p><p>يمكنك معرفة ما تبقى لك من سجلك الأكاديمي في بوابة الطالب، أو من مرشدك الأكاديمي.</p>'}; }
   if(!COLLEGE) return null;
   const ep=(ctx&&ctx.dept)||effectivePath(text);
   if(!ep){ return {needPath:true}; }
   if(ep===TRACK){ pendingCalc=false;
-    return {html:'<p>حساب الساعات المتبقية للتخرج غير متاح حاليًا لطلاب <b>مسار الأعمال (المسار المشترك)</b>؛ فالمعتمد حتى الآن مقررات المستويين الأول والثاني فقط (٣٥ وحدة)، وأما خطة ما بعد التخصيص فسيتم إضافتها بمجرد اعتمادها من الجهات المختصة بالجامعة.</p><p>للاستفسار عن وضعك الحالي راجع سجلك الأكاديمي أو مرشدك الأكاديمي.</p>'}; }
+    return {sum:'[حاسبة الساعات] '+TRACK+' — غير متاحة',html:'<p>حساب الساعات المتبقية للتخرج غير متاح حاليًا لطلاب <b>مسار الأعمال (المسار المشترك)</b>؛ فالمعتمد حتى الآن مقررات المستويين الأول والثاني فقط (٣٥ وحدة)، وأما خطة ما بعد التخصيص فسيتم إضافتها بمجرد اعتمادها من الجهات المختصة بالجامعة.</p><p>للاستفسار عن وضعك الحالي راجع سجلك الأكاديمي أو مرشدك الأكاديمي.</p>'}; }
   const plan=getPlan(ep);
   if(!plan){ pendingCalc=false; return {html:'<p>تعذّر تحميل بيانات خطة '+esc(ep)+' في الحاسبة. يرجى إبلاغ مسؤول النظام.</p>'}; }
   const D=parseCalc(src,plan);
@@ -631,22 +639,22 @@ function calcHTML(text,ctx){
   if(!hasB && !hasA){
     if(pendingCalc && !intent){ pendingCalc=false; return null; }
     pendingCalc=true;
-    return {prompt:true,html:'<p><b>حاسبة الساعات المتبقية — قسم '+esc(ep)+'</b></p><p>أرسل لي أحد الأمرين:</p><p>١) <b>عدد الوحدات (الساعات) التي اجتزتها</b>، مثل: «اجتزت ٦٠ وحدة» — فأحسب لك المتبقي من مجموع الخطة.</p><p>٢) أو <b>المقررات التي نجحت فيها</b> برموزها أو أسمائها، مثل: «ACCT 1111، BUS 1111، BUS 1141»، أو «أنهيت المستوى الأول والثاني» — فأعطيك تفصيلًا بالمتبقي حسب المستوى ونوع المتطلب، وما يمكنك تسجيله الآن بحسب المتطلبات السابقة.</p>'};
+    return {prompt:true,sum:'[حاسبة الساعات] قسم '+ep+' — طلب المعطيات (لم يُفهم عدد ولا مقررات)',html:'<p><b>حاسبة الساعات المتبقية — قسم '+esc(ep)+'</b></p><p>أرسل لي أحد الأمرين:</p><p>١) <b>عدد الوحدات (الساعات) التي اجتزتها</b>، مثل: «اجتزت ٦٠ وحدة» — فأحسب لك المتبقي من مجموع الخطة.</p><p>٢) أو <b>المقررات التي نجحت فيها</b> برموزها أو أسمائها، مثل: «ACCT 1111، BUS 1111، BUS 1141»، أو «أنهيت المستوى الأول والثاني» — فأعطيك تفصيلًا بالمتبقي حسب المستوى ونوع المتطلب، وما يمكنك تسجيله الآن بحسب المتطلبات السابقة.</p>'};
   }
   pendingCalc=false;
-  const note='<p style="color:#8a6d1f;font-size:.9em">تنبيه: هذا حساب استرشادي من الخطة الدراسية المعتمدة لقسمك وفي حدود البيانات التي ذكرتها، ولا يشمل المعادلات أو المقررات المحوّلة أو المعفاة أو حالات الرسوب، ولا يُحفظ شيء مما كتبت. المرجع الرسمي سجلك الأكاديمي في بوابة الطالب ومرشدك الأكاديمي.</p>';
+  const note='<p style="color:#8a6d1f;font-size:.9em">تنبيه: هذا حساب استرشادي من الخطة الدراسية المعتمدة لقسمك وفي حدود البيانات التي ذكرتها، ولا يشمل المعادلات أو المقررات المحوّلة أو المعفاة أو حالات الرسوب. لا يُحفظ نص ما كتبت، ويُسجَّل فقط ملخص ما فهمته الحاسبة (القسم وما ذكرت إنجازه) لتحسين الخدمة. المرجع الرسمي سجلك الأكاديمي في بوابة الطالب ومرشدك الأكاديمي.</p>';
   const head='<p><b>حساب الساعات المتبقية للتخرج — قسم '+esc(ep)+'</b></p>';
   /* ── النمط (أ) ── */
   if(!hasB){
     const tot=plan.tracks[0].total, n=D.num;
-    if(n>tot) return {html:head+'<p>العدد الذي ذكرته ('+ar(n)+') أكبر من مجموع وحدات خطة قسمك ('+vU(tot)+' معتمدة). تأكد من الرقم، أو اذكر المقررات التي اجتزتها.</p>'+note};
+    if(n>tot) return {sum:'[حاسبة الساعات] قسم '+ep+' — فُهم: اجتياز '+n+' وحدة (أكبر من مجموع الخطة '+tot+')',html:head+'<p>العدد الذي ذكرته ('+ar(n)+') أكبر من مجموع وحدات خطة قسمك ('+vU(tot)+' معتمدة). تأكد من الرقم، أو اذكر المقررات التي اجتزتها.</p>'+note};
     const rem=tot-n;
     let h=head+'<p>مجموع وحدات الخطة: <b>'+vU(tot)+' معتمدة</b> — المجتاز (حسب ما ذكرت): '+vU(n)+' — <b>المتبقي: '+vU(rem)+' معتمدة</b>.</p>';
     const coop=plan.tracks[0].levels.flatMap(l=>l.i).find(x=>x.pu);
     if(coop){ h+= n>=coop.pu ? '<p>استوفيت شرط الوحدات للتدريب التعاوني (١) ('+esc(coop.pt)+').</p>'
                               : '<p>متطلب التدريب التعاوني (١) هو '+esc(coop.pt)+'؛ يتبقى لك '+vU(coop.pu-n)+' لتستوفيه.</p>'; }
     h+='<p>لتفصيل المقررات المتبقية حسب المستوى وما يمكنك تسجيله الآن، اكتب المقررات التي نجحت فيها (رموزها أو أسماءها).</p>';
-    return {html:h+note};
+    return {sum:'[حاسبة الساعات] قسم '+ep+' — فُهم: اجتياز '+n+' وحدة · المتبقي '+rem+' من '+tot,html:h+note};
   }
   /* ── النمط (ب) ── */
   const {tr,conflict}=trackOf(plan,codes,text+' '+src);
@@ -678,8 +686,111 @@ function calcHTML(text,ctx){
     h+='<p><b>مقررات إجبارية استوفيتَ متطلباتها السابقة ويمكنك تسجيلها (بحسب الخطة):</b></p><ul>'+el.map(x=>'<li>'+liC(x)+' — '+(tracks[0].levels[x.lv]||{}).n+(x.withCo?' — تُسجَّل متزامنة مع '+x.withCo:'')+'</li>').join('')+'</ul>';
   }
   const ge=tr? r.gElig : r.gElig.filter(x=>x.g.startsWith('U'));
+  const csum='[حاسبة الساعات] قسم '+ep+(tr&&plan.tracks.length>1?' · '+tr.track:'')+' — فُهم: '+
+    (codes.length?'مقررات ('+codes.length+'): '+codes.slice(0,40).join('، '):'')+(codes.length&&D.levels.length?' · ':'')+(D.levels.length?'المستويات '+D.levels.join('، '):'')+
+    (D.num!==null?' · ذكر '+D.num+' وحدة':'')+(D.neg.length?' · مستبعد: '+[...new Set(D.neg)].join('، '):'')+' · المحتسب '+r.passedU+' · المتبقي '+r.remaining;
   if(ge.length) h+='<p><b>المقررات الاختيارية المتبقية:</b></p><ul>'+ge.map(x=>'<li>'+esc(x.G.title)+': متبقٍّ '+ar(x.left)+' من '+ar(x.G.pick)+(x.opts.length?' — المتاح لك الآن'+((r.vpick||{})[x.g]?' (عدا ما درسته منها)':'')+': '+x.opts.map(y=>esc(y.n)+' ('+y.c+')').join('، '):' — لم تستوفِ بعدُ المتطلب السابق لأيٍّ من مقرراتها')+'</li>').join('')+'</ul>';
-  return {html:h+note};
+  return {sum:csum,html:h+note};
+}
+
+/* ═══ حاسبة الغياب — حساب آلي من نصوص اللائحة دون نموذج ذكاء اصطناعي ═══
+   المادة (١): الفصل الدراسي لا يقل عن ١٥ أسبوعًا (نظام الفصلين).
+   القاعدة التنفيذية للمادة (١٤): يُحرم من الاختبار النهائي من تجاوز غيابه دون عذر ٢٥٪ من مجموع ساعات الاتصال.
+   القاعدة التنفيذية للمادة (١٥): يجوز رفع الحرمان بعذر مقبول على ألا يقل الحضور عن ٥٠٪.
+   ساعات الاتصال الأسبوعية = ساعات المقرر المعتمدة (افتراض مُعلن للطالب في التنبيه). */
+let pendingAbs=false;
+const ABS_G=/(غياب|غيابي|غياباتي|اغيب|يغيب|نغيب|غبت|تغيبت|اتغيب|يتغيب|التغيب|تغيب|غايب)/;
+const ABS_H=/(احرم|يحرم|انحرم|ينحرم|تنحرم|حرمان|محروم|يحرموني|انحرمت)/;
+const ABS_U=/(ساعه|ساعات|ساعتين|ساعتان|محاضره|محاضرات|حصه|حصص|كم مره|كم مرات)/;
+const ABS_WN={'ساعه واحده':1,'ساعتين':2,'ساعتان':2,'ثلاث ساعات':3,'ثلاثه ساعات':3,'اربع ساعات':4,'اربعه ساعات':4,'خمس ساعات':5,'خمسه ساعات':5,'ست ساعات':6,'سته ساعات':6};
+function absIntent(t){
+  if(/حاسبه (ال)?غياب/.test(t)) return true;
+  if(/(مكاف|منحه)/.test(t)) return false;                       /* «هل أُحرم من المكافأة إذا سجلت أقل من ١٢ ساعة» ليس سؤال غياب */
+  const g=ABS_G.test(t)&&ABS_U.test(t), h=ABS_H.test(t)&&/(محاضر|حصه|حصص)/.test(t);
+  if(!g && !h) return false;
+  /* سؤال كمّي فقط (كم/الحد/المسموح/أقدر/باقي…) أو فيه رقم؛ «غبت عن محاضرة بعذر طبي كيف أقدّمه» سؤال إجرائي للنموذج */
+  if(!/(كم|اقصي|الحد|حد |مسموح|المسموح|يحق|اقدر|ينفع|احسب|حساب|باقي|يتبقي|متبقي|تبقي|نسبه|\d)/.test(t)) return false;
+  if(/(اقدم|يقدم|تقديم|ارفع|اسلم|اعتذر|طريقه|الاجراء|اجراءات|وين|اين|مين|من يعتمد|يعتمد|نموذج)/.test(t)) return false;   /* إجراء تقديم العذر للنموذج */
+  if(/(غبت|غياب|غيابي|تغيبت|اغيب|التغيب|تغيب)\s*(عن|في|من)?\s*(ال)?(اختبار|امتحان)/.test(t)) return false;   /* الغياب عن الاختبار له باب آخر */
+  return true;
+}
+function hU(n){ return n===1?'ساعة واحدة':n===2?'ساعتان':ar(n)+(n>=3&&n<=10?' ساعات':' ساعة'); }
+function arDec(x){ return ar(String(Math.round(x*100)/100)).replace('.','٫'); }
+function courseUnits(code){
+  for(const e of KB){ if(!isPdata(e)) continue; let p; try{ p=JSON.parse(e.body); }catch(_){ continue; }
+    for(const tr of (p.tracks||[])){
+      const all=tr.levels.flatMap(l=>l.i).concat(Object.values(tr.groups||{}).flatMap(g=>g.c));
+      const x=all.find(y=>y.c===code); if(x) return {u:x.u,n:x.n};
+    } }
+  return null;
+}
+function parseAbs(text){
+  let t=cnorm(text);
+  const o={units:null,course:null,absent:null,absLect:null};
+  /* المقرر برمزه */
+  const cm=latinDigits(t).match(/\b([a-z]{2,5})\s*-?\s*(\d{4})\b/);
+  if(cm){ const c=cm[1].toUpperCase()+' '+cm[2], cu=courseUnits(c); if(cu){ o.units=cu.u; o.course={c:c,n:cu.n}; } t=t.replace(cm[0],' '); }
+  /* الأرقام بالكلمات */
+  Object.keys(ABS_WN).sort((a,b)=>b.length-a.length).forEach(k=>{ t=(' '+t+' ').replace(new RegExp(' '+k+' ','g'),' '+ABS_WN[k]+' ساعات ').trim(); });
+  /* الغياب الذي ذكره الطالب: فعل غياب يليه رقم مباشرة */
+  const am=t.match(/(غبت|تغيبت|غيابي|غياباتي|اغيب|اتغيب|غايب|وصل غيابي)\s*(الي|حتي|تقريبا)?\s*(\d{1,3})\s*(ساعات|ساعه|محاضرات|محاضره|حصص|حصه)?/);
+  if(am){ if(/محاضر|حص/.test(am[4]||'')) o.absLect=+am[3]; else o.absent=+am[3]; t=t.replace(am[0],' '); }
+  if(o.units===null){
+    let m, n=null;
+    if((m=t.match(/(ماده|مقرر|الماده|المقرر|بماده|بمقرر|لماده|لمقرر|كورس|ساعاتها|ساعاته|مدته)\s*(من|فيها|فيه|عدد ساعاته|عدد ساعاتها)?\s*(\d{1,2})(?!\d)/))) n=+m[3];
+    else if((m=t.match(/(?<!\d)(\d{1,2})\s*(ساعات|ساعه|وحدات|وحده)/))) n=+m[1];
+    else if((m=t.match(/^\s*(\d{1,2})\s*$/))) n=+m[1];
+    if(n!==null && n>=1 && n<=6) o.units=n;
+  }
+  return o;
+}
+function absRules(){
+  return '<li><b>دون عذر:</b> يُحرم الطالب من دخول الاختبار النهائي إذا تجاوز غيابه <b>٢٥٪</b> من مجموع ساعات الاتصال للمقرر (القاعدة التنفيذية للمادة ١٤ من لائحة الدراسة والاختبارات).</li>'+
+         '<li><b>بعذر مقبول:</b> يجوز لمجلس الكلية التي تقدم المقرر أو من يفوضه رفع الحرمان إذا قدّم الطالب عذرًا يقبله، على ألا يقل حضوره عن <b>٥٠٪</b> (القاعدة التنفيذية للمادة ١٥). ورفع الحرمان ليس تلقائيًا.</li>'+
+         '<li>غياب محاضرة الساعتين يُحتسب ساعتين، وغياب محاضرة الساعة يُحتسب ساعة؛ لذلك يُعدّ الغياب بالساعات لا بعدد المحاضرات.</li>';
+}
+const ABS_NOTE='<p style="color:#8a6d1f;font-size:.9em">تنبيه: حساب استرشادي على أساس أن ساعات الاتصال الأسبوعية تساوي ساعات المقرر المعتمدة، وأن الفصل ١٥ أسبوعًا (وهو الحد الأدنى في اللائحة، فالحد المحسوب هنا هو الأحوط). إن كان في مقررك دروس عملية أو تدريب أو نمط تعليم مختلف فساعات الاتصال الفعلية في توصيف المقرر. المرجع الرسمي سجل الغياب في النظام وأستاذ المقرر.</p>';
+function absLimits(U){ const T=U*15; return {T:T,no:Math.floor(T*0.25+1e-9),ex:Math.floor(T*0.5+1e-9),q:T*0.25}; }
+function absenceHTML(text){
+  const t=cnorm(text);
+  const intent=absIntent(t);
+  if(!intent){
+    if(!pendingAbs) return null;
+    pendingAbs=false;
+    const p0=parseAbs(text);
+    if(p0.units===null || tokens(text).length>4) return null;   /* ليس ردًّا على سؤال الحاسبة */
+  }
+  if(!COLLEGE) return null;
+  pendingAbs=false; pendingCalc=false;
+  const P=parseAbs(text);
+  if(P.units===null){
+    pendingAbs=true;
+    const row=U=>{ const L=absLimits(U); return '<li>مقرر '+hU(U)+': مجموعها في الفصل '+hU(L.T)+' — أقصى غياب دون عذر <b>'+hU(L.no)+'</b>، وبعذر مقبول حتى '+hU(L.ex)+'.</li>'; };
+    return {sum:'[حاسبة الغياب] عام — لم يُذكر عدد ساعات المقرر'+(P.absent!==null?' · غياب مذكور '+P.absent+' س':''),
+      html:'<p><b>حاسبة الغياب</b></p><p>يُحسب الحد بالساعات من مجموع ساعات الاتصال للمقرر في الفصل، والفصل الدراسي لا يقل عن ١٥ أسبوعًا (المادة ١ من لائحة الدراسة والاختبارات):</p>'+
+        '<ul>'+absRules()+'</ul><p><b>الحد حسب ساعات المقرر:</b></p><ul>'+[2,3,4].map(row).join('')+'</ul>'+
+        '<p>اكتب عدد ساعات مقررك (مثل: «٣ ساعات») أو رمزه، لأحسب لك بدقة. ويمكنك ذكر ساعات غيابك حتى الآن، مثل: «غبت ٦ ساعات في مادة ٣ ساعات».</p>'+ABS_NOTE};
+  }
+  const U=P.units, L=absLimits(U);
+  let h='<p><b>حاسبة الغياب — '+(P.course?esc(P.course.n)+' ('+P.course.c+')، ':'مقرر ')+hU(U)+(P.course?'':' معتمدة')+'</b></p><ul>'+
+    '<li>ساعات الاتصال الأسبوعية: '+hU(U)+(U===3?' (مثل: محاضرة ساعة + محاضرة ساعتين)':'')+'.</li>'+
+    '<li>مجموعها في الفصل: '+ar(U)+' × ١٥ أسبوعًا = <b>'+hU(L.T)+'</b> على الأقل؛ لأن الفصل الدراسي لا يقل عن ١٥ أسبوعًا (المادة ١ من لائحة الدراسة والاختبارات).</li>'+
+    '<li><b>دون عذر:</b> يُحرم الطالب من دخول الاختبار النهائي إذا تجاوز غيابه ٢٥٪ ('+arDec(L.q)+' ساعة)، فأقصى غياب مسموح <b>'+hU(L.no)+'</b>، والغياب '+hU(L.no+1)+' فأكثر يتجاوز النسبة (القاعدة التنفيذية للمادة ١٤).</li>'+
+    '<li><b>بعذر مقبول:</b> يجوز لمجلس الكلية التي تقدم المقرر أو من يفوضه رفع الحرمان، على ألا يقل حضورك عن ٥٠٪؛ أي ألا يزيد غيابك على <b>'+hU(L.ex)+'</b> (القاعدة التنفيذية للمادة ١٥). ورفع الحرمان ليس تلقائيًا.</li>'+
+    '<li>غياب محاضرة الساعتين يُحتسب ساعتين، وغياب محاضرة الساعة يُحتسب ساعة؛ لذلك يُعدّ الغياب بالساعات لا بعدد المحاضرات.</li></ul>';
+  let st='';
+  if(P.absent!==null){
+    const A=P.absent;
+    if(A>L.T){ h+='<p>عدد ساعات الغياب الذي ذكرته ('+ar(A)+') أكبر من مجموع ساعات المقرر في الفصل ('+hU(L.T)+'). تأكد من الرقم.</p>'; st='أكبر من المجموع'; }
+    else if(A<=L.no){ h+='<p><b>غيابك حسب ما ذكرت: '+hU(A)+'</b> — ما زلت ضمن الحد'+(L.no-A?'، ويتبقى لك قبل تجاوز ٢٥٪: <b>'+hU(L.no-A)+'</b>':'، وأي ساعة غياب إضافية دون عذر تتجاوز ٢٥٪')+'.</p>'; st='ضمن الحد'; }
+    else if(A<=L.ex){ h+='<p><b>غيابك حسب ما ذكرت: '+hU(A)+'</b> — تجاوز ٢٥٪، فتُحرم من دخول الاختبار النهائي ما لم يُرفع الحرمان بعذر يقبله مجلس الكلية أو من يفوضه؛ وغيابك لم يتجاوز ٥٠٪. راجع أستاذ المقرر ومرشدك الأكاديمي في أقرب وقت.</p>'; st='تجاوز 25%'; }
+    else { h+='<p><b>غيابك حسب ما ذكرت: '+hU(A)+'</b> — يتجاوز ٥٠٪ من ساعات الاتصال، والقاعدة التنفيذية للمادة ١٥ تشترط ألا يقل الحضور عن ٥٠٪ لرفع الحرمان. راجع مرشدك الأكاديمي.</p>'; st='تجاوز 50%'; }
+  } else if(P.absLect!==null){
+    h+='<p>ذكرتَ عدد المحاضرات ('+ar(P.absLect)+')؛ ولأن مدة المحاضرة تختلف (ساعة أو ساعتان)، حوّلها إلى ساعات ثم قارنها بالحد أعلاه.</p>'; st='ذكر محاضرات';
+  }
+  return {sum:'[حاسبة الغياب] مقرر '+U+' س'+(P.course?' ('+P.course.c+')':'')+' · المجموع '+L.T+' · الحد '+L.no+' / بعذر '+L.ex+
+            (P.absent!==null?' · غياب مذكور '+P.absent+' س ('+st+')':'')+(P.absLect!==null?' · غياب مذكور '+P.absLect+' محاضرات':''),
+          html:h+ABS_NOTE};
 }
 
 function inCollege(e){
@@ -770,13 +881,14 @@ function bubble(role,html){
   stream.appendChild(d); stream.scrollTop=stream.scrollHeight; return d;
 }
 /* ═══════════════ الترحيب وشبكة المواضيع والاقتراحات ═══════════════
-   شرط ثابت: كل سؤال هنا نجح في الفحص الحي على الخادم (تقرير 2026-10-21)، ما عدا زر الحاسبة فهو حساب آلي من الخطة لا يمر على النموذج.
+   شرط ثابت: كل سؤال هنا نجح في الفحص الحي على الخادم (تقرير 2026-10-21)، ما عدا زرّي الحاسبتين (الساعات من الخطة، والغياب من نصوص اللائحة) فهما حساب آلي لا يمر على النموذج.
    عند إضافة سؤال: شغّل الفحص الحي أولًا، ولا تضفه إلا إن نجح. */
 function collegeName(c){ return c==='التطبيقية' ? 'الكلية التطبيقية' : 'كلية '+c; }
 const TOPICS={
   'الأعمال':[
     ['المكافأة','كم المكافأة'],
     ['الغياب والحرمان','كم نسبة الغياب المسموحة'],
+    ['حاسبة الغياب','حاسبة الغياب'],
     ['الأعذار','غبت عن الاختبار النهائي بعذر وش اسوي'],
     ['الاختبارات','ماذا احضر معي للاختبار'],
     ['زي الطلاب','هل لازم البس ثوب وشماغ'],
@@ -797,6 +909,7 @@ const TOPICS={
   'التطبيقية':[
     ['المكافأة','كم المكافأة'],
     ['الغياب','كم نسبة الغياب المسموحة'],
+    ['حاسبة الغياب','حاسبة الغياب'],
     ['الاعتذار عن الفصل','كيف اعتذر عن الفصل'],
     ['العبء الدراسي','كم ساعة اسجل في الترم'],
     ['الفرصة الرابعة','ما هي الفرصة الرابعة'],
@@ -975,7 +1088,7 @@ function fullAnswer(botDiv, hits){
   return t;
 }
 /* ═══════════════ v5: إصدار الواجهة ومصافحة الخادم ═══════════════ */
-const CLIENT_VERSION='56';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
+const CLIENT_VERSION='57';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
 const SRV={version:null,count:null,emb:null,offline:false,pending:false};
 function arv(v){ return ar(v).replace('.','٫'); }
 function srvIsNew(){ return !!SRV.version && parseFloat(SRV.version)>=5; }
@@ -1253,6 +1366,15 @@ function askServer(text,hits,extra){
   return srvPost(Object.assign({action:'ask',q:text,college:COLLEGE,path:isDefTrackQuery(text)?'':effectivePath(text),
     sources:hits.map(e=>({id:e.id,article:e.article,source:e.source,title:e.title,body:e.body,status:e.status}))},extra||{}));
 }
+/* تلميح سؤال المتابعة: إن اعتُذر عن سؤال قصير معلّق على ما قبله، يُنبَّه الطالب لكتابته كاملًا (لا يغيّر البحث ولا الإجابة) */
+let LAST_Q='';
+function isFollowUp(text){
+  const t=stripCourtesy(text), n=tokens(t).length;
+  return /^(طيب|طب|زين|اوك|اوكي|يعني|واذا|ولو|وهل|وكيف|وكم|ومتي|ووش|وايش|وبعدين|طيب و)( |$)/.test(t)
+      || (n<=6 && /(^| )(يضيفها|يضيفه|يسويها|يسويه|يقبلها|يقبله|هذا|هذي|هذه|ذلك|ذاك|نفسها|نفسه|كذا|عليها|عليه|فيها|منها|لها|بها)( |$)/.test(t))
+      || n<=1;
+}
+const FOLLOW_HINT='<p class="hint-line">إن كان سؤالك متابعةً لسؤالك السابق، فاكتبه كاملًا بموضوعه، مثل: «هل يجوز زيادة العبء الدراسي إلى ٢٠ ساعة في حالات خاصة؟» بدل «طيب يقدر يضيفها لي؟».</p>';
 const REFUSE_HTML='<p>لا يتوفر لدي نص يجيب عن هذا.</p><p>أرجو مراجعة مرشدك الأكاديمي أو وحدة الإرشاد الأكاديمي بكليتك. سُجِّل سؤالك لإضافته إلى قاعدة المعرفة.</p>';
 
 /* ═══ خط المعالجة الكامل للسؤال (بلا واجهة): تستعمله الصفحة نفسها وفحص لوحة التحكم، فلا اختلاف بين ما يُختبر وما يراه الطالب ═══
@@ -1262,10 +1384,12 @@ async function resolveQuestion(text,opt){
   const extra=opt.model?{model:opt.model,token:opt.token}:{};
   const rk={extra:extra,noCache:!!opt.noCache};
 
-  /* ١) الحاسبة المحلية — سريعة ولا تستهلك حصة النموذج */
+  /* ١) الحاسبتان المحليتان (الغياب ثم الساعات) — سريعتان ولا تستهلكان حصة النموذج */
+  const abs=absenceHTML(text);
+  if(abs) return {type:'html',html:abs.html,kind:'absence',logQ:abs.sum};
   const calc=calcHTML(text);
   if(calc && calc.needPath) return {type:'needpath',kind:'calc'};
-  if(calc && calc.html && !calc.prompt) return {type:'html',html:calc.html,kind:'calc',logQ:'[حاسبة الساعات]'};
+  if(calc && calc.html && !calc.prompt) return {type:'html',html:calc.html,kind:'calc',logQ:calc.sum||'[حاسبة الساعات]'};
 
   const stt=smalltalk(text);
 
@@ -1278,10 +1402,10 @@ async function resolveQuestion(text,opt){
       const isCalc=R.intent==='calc';
       if(rr.needPath) return {type:'needpath',kind:isCalc?'calc':'plan',route:R};
       if(rr.html) return {type:'html',html:rr.html,kind:isCalc?'calc':'plan',route:R,
-                          logQ:isCalc?'[حاسبة الساعات]':'[جدول الخطة] '+text.slice(0,120)};
+                          logQ:isCalc?(rr.sum||'[حاسبة الساعات]')+' (عبر الموجّه)':'[جدول الخطة] '+text.slice(0,120)};
     }
   }
-  if(calc) return {type:'html',html:calc.html,kind:'calc',logQ:'[حاسبة الساعات]'};
+  if(calc) return {type:'html',html:calc.html,kind:'calc',logQ:calc.sum||'[حاسبة الساعات]'};
   if(stt) return {type:'chat',html:stt};
 
   /* ٣) الاسترجاع */
@@ -1349,7 +1473,7 @@ async function askRun(text,replay){
     }
     if(/^(تغيير|تغير|غير) (المسار|مساري|القسم|قسمي|التخصص|تخصصي)$/.test(ntx)){ startPathPick(); return; }
 
-    const logQ=(q,kind)=>srvPost({action:'log',q:q,found:-1,kind:kind,device:DEVICE}).catch(()=>{});
+    const logQ=(q,kind)=>srvPost({action:'log',q:q,found:-1,kind:kind,device:DEVICE,conv:CONV}).catch(()=>{});
     const r=await resolveQuestion(text,{showWait:showWait});
     hideWait();
 
@@ -1359,18 +1483,20 @@ async function askRun(text,replay){
       if(r.kind==='plan') logQ(text,'clarify');
       return;
     }
-    if(r.type==='html'){ const d=bubble('bot',r.html); topOf(d); logQ(r.logQ,r.kind); return; }
+    if(r.type==='html'){ LAST_Q=text; const d=bubble('bot',r.html); topOf(d); logQ(r.logQ,r.kind); return; }
 
     const chat=r.type==='chat', refused=r.type==='refuse';
     const d=bubble('bot',r.html);
     const ansText=fullAnswer(d,[]);            /* نص الإجابة وحده قبل إضافة المراجع وأزرار التقييم */
+    if(refused && LAST_Q && LAST_Q!==text && isFollowUp(text)) d.querySelector('.bubble').insertAdjacentHTML('beforeend',FOLLOW_HINT);
+    if(!chat) LAST_Q=text;
     const shown=(!chat && !refused)?(r.used||[]):[];
     if(shown.length) d.insertAdjacentHTML('beforeend', refsHTML(shown));
     if(!chat && !refused) d.insertAdjacentHTML('beforeend', rateHTML(text));
     topOf(d);
     srvPost({action:'log',q:text,found:chat?-1:(refused?0:shown.length),kind:chat?'chat':'q',
              articles:shown.map(x=>x.article).join(' | '),
-             answer:refsText(ansText,shown),device:DEVICE}).catch(()=>{});
+             answer:refsText(ansText,shown),device:DEVICE,conv:CONV}).catch(()=>{});
   } finally { hideWait(); renderChips(); }
 }
 
@@ -1383,10 +1509,29 @@ function rateHTML(text){
 }
 function rate(id,val){
   const q=RATE_Q[id]||''; const box=document.getElementById(id); if(!box) return;
-  box.querySelectorAll('button').forEach(b=>b.classList.remove('picked'));
-  box.querySelectorAll('button')[val?0:1].classList.add('picked');
-  srvPost({action:'log',q:q,found:'',kind:'q',rate:val,device:DEVICE}).catch(()=>{});
-  toast(val?'شكرًا لك':'سُجِّلت الملاحظة لمراجعة الفريق');
+  const bs=box.querySelectorAll(':scope > button');
+  bs.forEach(b=>b.classList.remove('picked')); bs[val?0:1].classList.add('picked');
+  srvPost({action:'log',q:q,found:'',kind:'q',rate:val,device:DEVICE,conv:CONV}).catch(()=>{});
+  rateNoteBox(id,val);
+  toast(val?'شكرًا لك':'سُجِّل تقييمك — ويمكنك كتابة ما الخطأ');
+}
+/* «غير دقيقة» ← سطر اختياري «ما الخطأ؟» يُحفظ في صف السؤال نفسه */
+function rateNoteBox(id,val){
+  const box=document.getElementById(id); if(!box) return;
+  const nb=box.querySelector('.rate-note');
+  if(val){ if(nb && !nb.classList.contains('done')) nb.remove(); return; }
+  if(nb) return;
+  box.insertAdjacentHTML('beforeend','<div class="rate-note"><input type="text" maxlength="300" placeholder="ما الخطأ في الإجابة؟ (اختياري)" aria-label="ما الخطأ في الإجابة؟">'+
+    '<button type="button" onclick="rateNote(\''+id+'\')">إرسال</button></div>');
+  const inp=box.querySelector('.rate-note input');
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); rateNote(id); } });
+}
+function rateNote(id){
+  const box=document.getElementById(id); if(!box) return;
+  const nb=box.querySelector('.rate-note'), inp=nb&&nb.querySelector('input'), v=(inp&&inp.value||'').trim();
+  if(!v){ if(inp) inp.focus(); return; }
+  srvPost({action:'log',q:RATE_Q[id]||'',found:'',kind:'q',rate:0,note:v,device:DEVICE,conv:CONV}).catch(()=>{});
+  nb.className='rate-note done'; nb.textContent='شكرًا — وصلت ملاحظتك لفريق المرشد.';
 }
 
 /* ══════════════════ الإقلاع ══════════════════ */
