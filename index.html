@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>المرشد الذكي — كلية الأعمال، جامعة الجوف</title>
-<meta name="build" content="v58">
+<meta name="build" content="v59">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -293,7 +293,7 @@ html,body{height:100%;overflow:hidden}
     <textarea id="q" rows="1" placeholder="اكتب سؤالك الأكاديمي هنا…"></textarea>
     <button class="send" id="send">إرسال</button>
   </div>
-  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٨</span></p>
+  <p class="disclaimer">إجابات استرشادية من لوائح الجامعة. المرجع الرسمي هو اللوائح المعتمدة، ومرشدك الأكاديمي للحالات الفردية. <span id="verline" class="verline">الإصدار ٥٩</span></p>
 </div>
 
 </div><!-- /wrap -->
@@ -1088,7 +1088,7 @@ function fullAnswer(botDiv, hits){
   return t;
 }
 /* ═══════════════ v5: إصدار الواجهة ومصافحة الخادم ═══════════════ */
-const CLIENT_VERSION='58';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
+const CLIENT_VERSION='59';   /* يطابق VERSION في Code.gs — زِدهما معًا عند كل تحديث */
 const SRV={version:null,count:null,emb:null,offline:false,pending:false};
 function arv(v){ return ar(v).replace('.','٫'); }
 function srvIsNew(){ return !!SRV.version && parseFloat(SRV.version)>=5; }
